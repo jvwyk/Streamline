@@ -327,11 +327,6 @@ is retained only by older tooling.
     /Streamline.Registry.Hybrid           (YAML source, Postgres cache)
       HybridRegistryRepository.cs         (wraps YamlRegistryLoader + PostgresRegistryRepository)
       HybridRegistryModule.cs             (DI extension: services.AddHybridRegistry(...))
-      Files/
-        FileReaderRegistry.cs            (resolves IFileReader / IFileDispatcher by format)
-        FileHasher.cs
-      Logging/
-        StreamlineLoggerExtensions.cs
 
     /Streamline.Files.Delimited             (wraps CsvHelper)
       DelimitedFileReader.cs                (implements IFileReader)
