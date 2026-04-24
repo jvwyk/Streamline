@@ -31,7 +31,11 @@ Phase 1 (domain + in-memory infrastructure) is the next milestone.
 
 ## Requirements
 
-- .NET 10 SDK (`10.0.x`).
+- **.NET 10 SDK** — install from
+  <https://dotnet.microsoft.com/download/dotnet/10.0> or via your
+  platform package manager (e.g., `apt install dotnet-sdk-10.0` on
+  Debian/Ubuntu). The repo is known to build against SDK **10.0.107**
+  (any later `10.0.x` is fine). CI pins `dotnet-version: '10.0.x'`.
 - Docker — only needed once Phase 2 lands Testcontainers-backed
   integration tests. Not required today.
 
