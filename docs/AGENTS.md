@@ -99,8 +99,14 @@ thing you want to do probably belongs in a different layer.
 
 ### Requirements
 
-- .NET 10 SDK
-- Docker (for Testcontainers integration tests)
+- **.NET 10 SDK** — install from
+  <https://dotnet.microsoft.com/download/dotnet/10.0> (Microsoft) or
+  via the platform package manager (e.g., `apt install dotnet-sdk-10.0`
+  on Debian/Ubuntu). The repo is known to build against SDK
+  **10.0.107** (or any later 10.0.x). The CI workflow pins
+  `dotnet-version: '10.0.x'`, so any patch revision in the 10.0
+  channel is fine.
+- Docker (for Testcontainers integration tests, Phase 2 onward).
 - A local Postgres is not required — tests spin their own up via
   Testcontainers; the Console reads connection strings from config.
 
