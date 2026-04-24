@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Streamline.Core\Streamline.Core.csproj" />
+  </ItemGroup>
+
+</Project>
