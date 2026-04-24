@@ -68,9 +68,21 @@ Full structure is in the plan's Section 5.2. Summary:
   /Streamline.Files.Zip            — zip container dispatcher
   /Streamline.Console              — the reference host
 /tests
-  /Streamline.*.Tests              — one per src project
-  /Streamline.Architecture.Tests   — NetArchTest layer-dependency rules
+  /Streamline.Core.Tests
+  /Streamline.Domain.Tests
+  /Streamline.Application.Tests        — uses in-memory infrastructure fakes
+  /Streamline.Infrastructure.Tests     — Testcontainers-backed
+  /Streamline.Registry.Postgres.Tests  — Testcontainers-backed
+  /Streamline.Integration.Tests        — end-to-end via the Console host
+  /Streamline.Architecture.Tests       — NetArchTest + csproj inspection
 ```
+
+The plan's §5.2 is the source of truth for which test projects exist.
+Per-format test projects (`Streamline.Files.*.Tests`) and the
+non-Postgres registry test projects (`Streamline.Registry.Yaml.Tests`,
+`Streamline.Registry.Hybrid.Tests`) are created in the phase that
+first needs them, not up front. `Streamline.Performance.Tests` lands
+when nightly performance gating begins.
 
 **Dependency direction is strict.** Core has no dependencies. Domain
 depends only on Core. Application depends on Domain + Core. Infrastructure
