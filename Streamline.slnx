@@ -13,4 +13,13 @@
     <Project Path="src/Streamline.Registry.Postgres/Streamline.Registry.Postgres.csproj" />
     <Project Path="src/Streamline.Registry.Yaml/Streamline.Registry.Yaml.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Streamline.Application.Tests/Streamline.Application.Tests.csproj" />
+    <Project Path="tests/Streamline.Architecture.Tests/Streamline.Architecture.Tests.csproj" />
+    <Project Path="tests/Streamline.Core.Tests/Streamline.Core.Tests.csproj" />
+    <Project Path="tests/Streamline.Domain.Tests/Streamline.Domain.Tests.csproj" />
+    <Project Path="tests/Streamline.Infrastructure.Tests/Streamline.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Streamline.Integration.Tests/Streamline.Integration.Tests.csproj" />
+    <Project Path="tests/Streamline.Registry.Postgres.Tests/Streamline.Registry.Postgres.Tests.csproj" />
+  </Folder>
 </Solution>

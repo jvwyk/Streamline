@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Streamline.Registry.Postgres\Streamline.Registry.Postgres.csproj" />
+  </ItemGroup>
+
+</Project>

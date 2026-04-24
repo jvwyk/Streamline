@@ -18,4 +18,18 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.203" />
   </ItemGroup>
 
+  <ItemGroup Label="Test frameworks">
+    <!--
+      xUnit v3 is the current generation for new .NET 10 projects.
+      AwesomeAssertions is the community fork of FluentAssertions 7.x under
+      Apache-2.0; FluentAssertions 8.x moved to a paid commercial licence.
+    -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.4.0" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.4.0" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.0" />
+  </ItemGroup>
+
 </Project>

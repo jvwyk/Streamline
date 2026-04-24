@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    References every src assembly so NetArchTest can inspect the whole
+    graph. NetArchTest.Rules is added (with its PackageVersion) in the
+    next commit along with the actual layering-rule test.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Streamline.Core\Streamline.Core.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Domain\Streamline.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Application\Streamline.Application.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Infrastructure\Streamline.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Registry.Postgres\Streamline.Registry.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Registry.Yaml\Streamline.Registry.Yaml.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Registry.Hybrid\Streamline.Registry.Hybrid.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Files.Delimited\Streamline.Files.Delimited.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Files.Xlsx\Streamline.Files.Xlsx.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Files.Json\Streamline.Files.Json.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Files.Zip\Streamline.Files.Zip.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Console\Streamline.Console.csproj" />
+  </ItemGroup>
+
+</Project>
