@@ -66,7 +66,10 @@ databases, files, or time.
 - One test class per production class.
 - Test names: `MethodName_Scenario_ExpectedBehavior`.
   Example: `TransitionRow_FromCommittedToPending_Throws`.
-- Use `FluentAssertions`. `x.Should().Be(y)` not `Assert.Equal(y, x)`.
+- Use `AwesomeAssertions` (Apache-2.0 community fork of FluentAssertions
+  7.x; FluentAssertions 8.x moved to a paid commercial licence so we
+  swapped it out before adopting it). `x.Should().Be(y)` not
+  `Assert.Equal(y, x)` — the `.Should()` API is identical to FluentAssertions.
 - `NSubstitute` for mocks, sparingly. Prefer real collaborators or
   in-memory fakes.
 

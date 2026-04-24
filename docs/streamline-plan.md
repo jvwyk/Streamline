@@ -633,7 +633,11 @@ Goal: scaffolding in place, CI green, zero business logic yet.
 - Create solution and all src projects with correct dependency
   directions.
 - Create all test projects referencing their corresponding src
-  projects plus test frameworks (xUnit, FluentAssertions, NSubstitute).
+  projects plus test frameworks (xUnit v3, AwesomeAssertions,
+  NSubstitute, coverlet.collector). AwesomeAssertions is the
+  Apache-2.0 community fork of FluentAssertions 7.x; FluentAssertions
+  8.x adopted a paid commercial licence, so we standardise on the
+  free fork. The `.Should()` API is identical.
 - Add `Streamline.Architecture.Tests` with `NetArchTest` rules enforcing
   dependency direction.
 - Set up CI pipeline: restore, build, test, on every PR. No deploy
