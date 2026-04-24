@@ -1,25 +1,26 @@
 using System.Collections.Immutable;
+using Streamline.Core.Observations;
 
 namespace Streamline.Core.Results;
 
 /// <summary>
 /// Batch-level processing outcome returned by <c>ProcessBatchHandler</c>.
 /// Aggregates <see cref="TableProcessingOutcome"/> records across every
-/// target table the batch processed, with computed totals.
+/// target table the batch processed, plus the <see cref="Observation"/>s
+/// raised during processing, plus computed totals.
 /// </summary>
-/// <remarks>
-/// No observations are carried here in sub-phase 1a; the field for
-/// <c>ImmutableArray&lt;Observation&gt;</c> lands in sub-phase 1b
-/// once the observation model exists.
-/// </remarks>
 public sealed record class ProcessingResult
 {
     public ImmutableArray<TableProcessingOutcome> Tables { get; }
+    public ImmutableArray<Observation> Observations { get; }
 
-    public ProcessingResult(IEnumerable<TableProcessingOutcome> tables)
+    public ProcessingResult(
+        IEnumerable<TableProcessingOutcome> tables,
+        IEnumerable<Observation>? observations = null)
     {
         ArgumentNullException.ThrowIfNull(tables);
         Tables = [.. tables];
+        Observations = observations is null ? [] : [.. observations];
     }
 
     public long TotalRowsCommitted => Tables.Sum(t => t.RowsCommitted);
@@ -30,7 +31,9 @@ public sealed record class ProcessingResult
     public static ProcessingResult Empty { get; } = new(Array.Empty<TableProcessingOutcome>());
 
     public bool Equals(ProcessingResult? other) =>
-        other is not null && Tables.SequenceEqual(other.Tables);
+        other is not null
+        && Tables.SequenceEqual(other.Tables)
+        && Observations.SequenceEqual(other.Observations);
 
     public override int GetHashCode()
     {
@@ -38,6 +41,10 @@ public sealed record class ProcessingResult
         foreach (var table in Tables)
         {
             hash.Add(table);
+        }
+        foreach (var observation in Observations)
+        {
+            hash.Add(observation);
         }
         return hash.ToHashCode();
     }

@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using Streamline.Core.Observations;
 using Streamline.Core.Results;
 using Xunit;
 
@@ -6,6 +7,10 @@ namespace Streamline.Core.Tests.Results;
 
 public class IngestionResultTests
 {
+    private static readonly DateTimeOffset FixedTime =
+        new(2026, 4, 24, 12, 0, 0, TimeSpan.Zero);
+
+
     [Fact]
     public void Totals_SumAcrossFiles()
     {
@@ -50,5 +55,62 @@ public class IngestionResultTests
         a.Should().Be(b);
         a.GetHashCode().Should().Be(b.GetHashCode());
         a.Should().NotBe(c);
+    }
+
+    /// <summary>
+    /// Back-compat guard: constructing without the observations argument
+    /// must continue to work. Pre-1b callers did this and their code
+    /// should keep compiling and running.
+    /// </summary>
+    [Fact]
+    public void Construct_WithoutObservations_GivesEmptyObservationsField()
+    {
+        var result = new IngestionResult(
+            [new FileIngestionOutcome("a.csv", 10, 10, 0, TimeSpan.Zero)]);
+
+        result.Observations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Construct_WithObservations_PropagatesThem()
+    {
+        var obs = new[]
+        {
+            new Observation(ObservationSeverity.Info, "FILE_INGESTED", "ok", "batch-1", FixedTime),
+            new Observation(ObservationSeverity.Warning, "FILE_EMPTY", "empty", "batch-1", FixedTime)
+            {
+                FileLogId = 2,
+            },
+        };
+
+        var result = new IngestionResult(
+            [new FileIngestionOutcome("a.csv", 10, 10, 0, TimeSpan.Zero)],
+            obs);
+
+        result.Observations.Should().HaveCount(2);
+        result.Observations[0].Code.Should().Be("FILE_INGESTED");
+        result.Observations[1].FileLogId.Should().Be(2);
+    }
+
+    [Fact]
+    public void Equality_IncludesObservationSequence()
+    {
+        var files = new[] { new FileIngestionOutcome("a.csv", 1, 1, 0, TimeSpan.Zero) };
+        var obs1 = new Observation(ObservationSeverity.Info, "FILE_INGESTED", "ok", "b", FixedTime);
+        var obs2 = new Observation(ObservationSeverity.Warning, "FILE_EMPTY", "empty", "b", FixedTime);
+
+        var a = new IngestionResult(files, [obs1]);
+        var b = new IngestionResult(files, [obs1]);
+        var different = new IngestionResult(files, [obs2]);
+
+        a.Should().Be(b);
+        a.GetHashCode().Should().Be(b.GetHashCode());
+        a.Should().NotBe(different);
+    }
+
+    [Fact]
+    public void Empty_HasNoObservations()
+    {
+        IngestionResult.Empty.Observations.Should().BeEmpty();
     }
 }

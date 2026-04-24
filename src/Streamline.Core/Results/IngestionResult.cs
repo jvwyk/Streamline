@@ -1,25 +1,26 @@
 using System.Collections.Immutable;
+using Streamline.Core.Observations;
 
 namespace Streamline.Core.Results;
 
 /// <summary>
 /// Batch-level ingestion outcome returned by <c>IngestBatchHandler</c>.
 /// Aggregates <see cref="FileIngestionOutcome"/> records across every
-/// file the batch staged, with computed totals.
+/// file the batch staged, plus the <see cref="Observation"/>s raised
+/// during ingestion, plus computed totals.
 /// </summary>
-/// <remarks>
-/// No observations are carried here in sub-phase 1a; the field for
-/// <c>ImmutableArray&lt;Observation&gt;</c> lands in sub-phase 1b
-/// once the observation model exists.
-/// </remarks>
 public sealed record class IngestionResult
 {
     public ImmutableArray<FileIngestionOutcome> Files { get; }
+    public ImmutableArray<Observation> Observations { get; }
 
-    public IngestionResult(IEnumerable<FileIngestionOutcome> files)
+    public IngestionResult(
+        IEnumerable<FileIngestionOutcome> files,
+        IEnumerable<Observation>? observations = null)
     {
         ArgumentNullException.ThrowIfNull(files);
         Files = [.. files];
+        Observations = observations is null ? [] : [.. observations];
     }
 
     public long TotalRowsRead => Files.Sum(f => f.RowsRead);
@@ -30,7 +31,9 @@ public sealed record class IngestionResult
     public static IngestionResult Empty { get; } = new(Array.Empty<FileIngestionOutcome>());
 
     public bool Equals(IngestionResult? other) =>
-        other is not null && Files.SequenceEqual(other.Files);
+        other is not null
+        && Files.SequenceEqual(other.Files)
+        && Observations.SequenceEqual(other.Observations);
 
     public override int GetHashCode()
     {
@@ -38,6 +41,10 @@ public sealed record class IngestionResult
         foreach (var file in Files)
         {
             hash.Add(file);
+        }
+        foreach (var observation in Observations)
+        {
+            hash.Add(observation);
         }
         return hash.ToHashCode();
     }
