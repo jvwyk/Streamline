@@ -211,14 +211,17 @@ is retained only by older tooling.
         DriftPolicy.cs            (Block, Warn, Ignore)
         ColumnTypeCode.cs         (String, Integer, BigInt, Decimal, Date, Timestamp, Boolean, Uuid)
       ValueTypes/
-        Record.cs                 (immutable key→value dictionary)
+        Record.cs                 (immutable key→value map + SourceFileName + SourceRowIndex)
         ColumnDefinition.cs
         SchemaDefinition.cs
         FileMapping.cs
         ValidationError.cs
+        FkReference.cs            (parent table + parent column + FkEnforcementMode)
       Results/
         IngestionResult.cs
+        FileIngestionOutcome.cs   (per-file aggregate inside IngestionResult)
         ProcessingResult.cs
+        TableProcessingOutcome.cs (per-table aggregate inside ProcessingResult)
         ValidationResult.cs
         UpsertOutcome.cs
 
