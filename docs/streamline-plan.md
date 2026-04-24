@@ -194,8 +194,12 @@ erodes fast without a guardrail.
 
 ### 5.2 Solution Structure
 
+`dotnet new sln` produces `Streamline.slnx` (the new XML solution
+format, default in current .NET 10 SDKs); the legacy `.sln` filename
+is retained only by older tooling.
+
 ```
-/Streamline.sln
+/Streamline.slnx
   /src
     /Streamline.Core
       Enums/
