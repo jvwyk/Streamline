@@ -2,9 +2,13 @@
 
   <!--
     References every src assembly so NetArchTest can inspect the whole
-    graph. NetArchTest.Rules is added (with its PackageVersion) in the
-    next commit along with the actual layering-rule test.
+    graph, plus every Streamline.* test assembly's headline so that
+    accidental src->test references can be detected at assembly level.
   -->
+
+  <ItemGroup>
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Streamline.Core\Streamline.Core.csproj" />
