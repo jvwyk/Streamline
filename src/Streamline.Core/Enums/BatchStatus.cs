@@ -6,6 +6,16 @@ namespace Streamline.Core.Enums;
 /// <see cref="RowStatus"/>; it tracks which phase of the pipeline the
 /// batch is in, not the fate of individual rows. See
 /// docs/streamline-plan.md §5.3.
+///
+/// The batch model is intentionally not symmetric with the row model.
+/// There is an <see cref="Ingesting"/> / <see cref="Ingested"/> split
+/// because ingestion and processing are distinct phases (retry
+/// re-enters processing without re-ingesting), but there is no
+/// corresponding "Processed" intermediate — a batch in
+/// <see cref="Processing"/> transitions directly to <see cref="Completed"/>
+/// or <see cref="Failed"/>. Row terminal states (Committed, Quarantined,
+/// RolledBack) carry the per-row resolution; the batch state carries
+/// the phase.
 /// </summary>
 public enum BatchStatus
 {

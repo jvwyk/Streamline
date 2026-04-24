@@ -7,6 +7,11 @@ namespace Streamline.Core.Enums;
 /// string values to the corresponding .NET type during validation; a
 /// value that cannot be coerced becomes <c>INVALID_TYPE</c>. Per plan
 /// §5.2 initial set.
+///
+/// Values are intentionally named after their mapped .NET types
+/// (<c>String</c>, <c>Integer</c>, <c>Decimal</c>, etc.). The naming
+/// documents the type mapping at the call site; see the CA1720
+/// suppression below for the justification.
 /// </summary>
 [SuppressMessage(
     "Naming",
