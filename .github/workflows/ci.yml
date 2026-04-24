@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Concurrency: only one run per ref at a time. Newer pushes cancel in-flight runs.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test (.NET 10)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Streamline.slnx
+
+      - name: Build
+        # TreatWarningsAsErrors is set in Directory.Build.props, so any new
+        # analyzer warning breaks the build.
+        run: dotnet build Streamline.slnx --no-restore --configuration Release
+
+      - name: Test
+        # --filter Category!=Integration excludes Testcontainers-backed tests
+        # that need Docker. Integration tests run as a separate job (below)
+        # once they exist; for Phase 0 the filter is a no-op because no test
+        # is marked [Trait("Category", "Integration")].
+        run: >
+          dotnet test Streamline.slnx
+          --no-build
+          --configuration Release
+          --filter "Category!=Integration"
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory ${{ github.workspace }}/TestResults
+          --collect:"XPlat Code Coverage"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ${{ github.workspace }}/TestResults
+          retention-days: 14
