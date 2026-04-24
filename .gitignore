@@ -1,0 +1,56 @@
+# .NET build output
+bin/
+obj/
+out/
+publish/
+artifacts/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.swp
+*~
+
+# Test results and coverage
+TestResults/
+[Cc]overage/
+coverage*.xml
+coverage*.json
+coverage*.info
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+*.snupkg
+*.nuspec.generated
+.nuget/
+packages/
+!**/packages/build/
+
+# Rider
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets (never commit)
+*.pfx
+*.snk
+appsettings.*.local.json
+secrets.json
+.env
+.env.*
+!.env.example

@@ -1,0 +1,44 @@
+<Project>
+
+  <!--
+    Repo-wide build configuration. Centralises target framework, language
+    version, nullability, and analyzer settings for every project under this
+    directory. Per project overrides are allowed by redeclaring below an
+    <Import> of this file, but should be rare.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!--
+      Warnings demoted from errors, with rationale. Keep this list short.
+      Add an entry only with a one-line justification; remove once the
+      underlying cause is gone.
+
+      CA1812: Avoid uninstantiated internal classes. DI-registered types
+              often look uninstantiated to the analyzer because construction
+              happens through the container, not direct `new`.
+      CA1515: Consider making public types internal. Public surface is
+              intentional for types that consumers (including Streamline.Console)
+              will touch; we judge public/internal case-by-case, not globally.
+    -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CA1812;CA1515</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Every project under the repo gets the SDK-bundled analyzers explicitly.
+      Version pinned via central package management in Directory.Packages.props.
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

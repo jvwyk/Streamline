@@ -1,0 +1,21 @@
+<Project>
+
+  <!--
+    Central Package Management. Every PackageReference in this repo must omit
+    its Version attribute; the version comes from this file. This gives us
+    one canonical place to upgrade a package and prevents version drift.
+
+    Additions land in the commit that first consumes the package. Keep
+    groupings clear: analyzers, test frameworks, production dependencies.
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="Analyzers">
+    <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.203" />
+  </ItemGroup>
+
+</Project>
