@@ -188,9 +188,11 @@ know nothing of outer layers.
 - No layer imports `Npgsql`, `Cinchoo`, or any concrete library outside
   `Infrastructure`.
 
-Architecture tests (using `NetArchTest` or similar) fail the build if
-these rules are violated. This is non-negotiable — layering discipline
-erodes fast without a guardrail.
+Architecture tests fail the build if these rules are violated. This is
+non-negotiable — layering discipline erodes fast without a guardrail.
+The implementation combines csproj-XML inspection (declaration-level
+rules) with `NetArchTest` (type-level rules); see the Phase 0 entry
+in §6 for why both layers exist.
 
 ### 5.2 Solution Structure
 
@@ -637,8 +639,16 @@ Goal: scaffolding in place, CI green, zero business logic yet.
   Apache-2.0 community fork of FluentAssertions 7.x; FluentAssertions
   8.x adopted a paid commercial licence, so we standardise on the
   free fork. The `.Should()` API is identical.
-- Add `Streamline.Architecture.Tests` with `NetArchTest` rules enforcing
-  dependency direction.
+- Add `Streamline.Architecture.Tests` enforcing dependency direction
+  via two complementary mechanisms: (1) parsing each src project's
+  `csproj` XML for declared `ProjectReference` entries against an
+  allow-list per project, and (2) `NetArchTest` type-level rules.
+  The csproj layer catches declaration-level violations on empty
+  scaffolds (where no types exist yet, so the compiler drops unused
+  references and `NetArchTest` alone passes trivially). The
+  `NetArchTest` layer activates as types land in later phases. Failures
+  collect every violation across all checks before asserting, so the
+  failure message names every offender at once.
 - Set up CI pipeline: restore, build, test, on every PR. No deploy
   stage yet. CI targets .NET 10 only.
 - Configure `.editorconfig`, nullable reference types on, analyzer rules.
