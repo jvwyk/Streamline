@@ -103,4 +103,21 @@ public class FileMappingTests
         a.GetHashCode().Should().Be(b.GetHashCode());
         a.Should().NotBe(different);
     }
+
+    /// <summary>
+    /// Regression guard: equality must not depend on the insertion
+    /// order of reader-config entries. See the companion test in
+    /// RecordTests — same rationale.
+    /// </summary>
+    [Fact]
+    public void Equality_IgnoresInsertionOrderOfReaderConfig()
+    {
+        var insertAscending = new FileMapping(".*", "t", "delimited",
+            new Dictionary<string, string> { ["delimiter"] = ",", ["skip_rows"] = "0", ["encoding"] = "utf-8" });
+        var insertDescending = new FileMapping(".*", "t", "delimited",
+            new Dictionary<string, string> { ["encoding"] = "utf-8", ["skip_rows"] = "0", ["delimiter"] = "," });
+
+        insertAscending.Should().Be(insertDescending);
+        insertAscending.GetHashCode().Should().Be(insertDescending.GetHashCode());
+    }
 }

@@ -168,4 +168,25 @@ public class RecordTests
         a.GetHashCode().Should().Be(b.GetHashCode());
         a.Should().NotBe(differentRow);
     }
+
+    /// <summary>
+    /// Regression guard: equality must not depend on the insertion
+    /// order of values into the underlying ImmutableDictionary. The
+    /// default record-generated Equals would delegate to
+    /// ImmutableDictionary.Equals, which is reference-based and
+    /// would fail this test. The overridden Equals compares element
+    /// by element. If a future contributor "simplifies" by removing
+    /// the override, this test catches it.
+    /// </summary>
+    [Fact]
+    public void Equality_IgnoresInsertionOrderOfValues()
+    {
+        var insertAscending = new Record("f.csv", 0,
+            new Dictionary<string, object?> { ["a"] = 1, ["b"] = 2, ["c"] = 3 });
+        var insertDescending = new Record("f.csv", 0,
+            new Dictionary<string, object?> { ["c"] = 3, ["b"] = 2, ["a"] = 1 });
+
+        insertAscending.Should().Be(insertDescending);
+        insertAscending.GetHashCode().Should().Be(insertDescending.GetHashCode());
+    }
 }
