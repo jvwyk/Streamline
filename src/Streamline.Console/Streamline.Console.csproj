@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!--
-    Host project. Currently a classlib so the scaffold commit composes;
-    commit 6 flips OutputType to Exe and adds the minimal Program.cs.
-  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Streamline.Console</RootNamespace>
+    <AssemblyName>Streamline.Console</AssemblyName>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Streamline.Core\Streamline.Core.csproj" />
