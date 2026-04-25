@@ -22,6 +22,7 @@ against.
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Development rhythm: plan, implement, test, commit. |
 | [`docs/TESTING.md`](docs/TESTING.md) | Testing requirements. Strict and enforced. |
 | [`docs/OBSERVATIONS.md`](docs/OBSERVATIONS.md) | Observation taxonomy and stable code catalog. |
+| [`docs/PARKED.md`](docs/PARKED.md) | Deferred decisions awaiting their owning sub-phase. |
 
 ## Status
 

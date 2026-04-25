@@ -43,6 +43,12 @@ Before touching any code on a new task, you must have read:
 3. **`WORKFLOW.md` — development rhythm.** How to pick up a task, when
    to stop and ask, how to structure commits, what "done" means.
 
+4. **`PARKED.md` — deferred decisions.** Calls that surfaced in earlier
+   sub-phases but weren't yet ready to make. Review at the start of
+   every sub-phase whose name appears in **Resolve in** for any active
+   entry. New deferrals get a new entry; resolutions get linked back
+   to the resolving commit.
+
 If the task touches a specific concern (transforms, file readers,
 reconciliation, etc.), also skim the relevant subsection of the plan's
 Section 5.3 (Domain Model).
@@ -447,6 +453,7 @@ A task is NOT done when:
 | `TESTING.md` | Testing strategy and requirements (strict) |
 | `WORKFLOW.md` | Work cycle, commits, PRs |
 | `OBSERVATIONS.md` | Observation codes, severities, where each is emitted |
+| `PARKED.md` | Deferred decisions awaiting their owning sub-phase |
 | `AGENTS.md` | This file — session startup |
 | `README.md` | Project overview, quick start |
 | `CHANGELOG.md` | What shipped, when, what broke |
