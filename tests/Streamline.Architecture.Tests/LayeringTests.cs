@@ -84,6 +84,41 @@ public class LayeringTests
             "every entry in this list names an illegal reference that needs to be removed");
     }
 
+    /// <summary>
+    /// Every type in <c>Streamline.Domain.Abstractions</c> must be a
+    /// public interface. Classes (or internals) in Abstractions/ would
+    /// be miscategorised — the namespace is reserved for engine-side
+    /// contracts that consumers / implementations sit on top of.
+    /// </summary>
+    [Fact]
+    public void Abstractions_namespace_contains_only_public_interfaces()
+    {
+        var domainAssembly = LoadStreamlineAssembly("Streamline.Domain");
+        var abstractionTypes = domainAssembly
+            .GetTypes()
+            .Where(t => t.Namespace == "Streamline.Domain.Abstractions")
+            .ToArray();
+
+        var violations = new List<string>();
+
+        foreach (var type in abstractionTypes)
+        {
+            if (!type.IsInterface)
+            {
+                violations.Add(
+                    $"{type.FullName} is not an interface (Abstractions/ is reserved for interface contracts).");
+            }
+            if (!type.IsPublic)
+            {
+                violations.Add(
+                    $"{type.FullName} is not public (interfaces in Abstractions/ are contracts for cross-assembly implementers).");
+            }
+        }
+
+        violations.Should().BeEmpty(
+            "Streamline.Domain.Abstractions is reserved for public interfaces only");
+    }
+
     [Fact]
     public void Library_boundaries_are_respected()
     {
