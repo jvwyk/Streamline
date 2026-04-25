@@ -35,20 +35,20 @@ useful when revisiting.
 | | |
 |---|---|
 | **Surfaced in** | Sub-phase 1b (commit 3, IObservationSink interface). |
-| **Resolve in** | Sub-phase 1f (use-case handlers / orchestrators). |
+| **Resolve in** | Sub-phase 1f-ii (orchestrators wire the resilient sink in). |
 | **Question** | When `IObservationSink.RecordAsync` throws inside a per-row hot loop (e.g. `RowValidator` emitting `MISSING_REQUIRED` per row), should the orchestrator abort the row currently being processed, abort the whole batch, or let the in-flight row complete before bubbling? |
-| **Context / leanings** | The interface contract (1b) says exceptions propagate; production sinks buffer to avoid hot-path faulting. But buffer overflow / retry-exhausted scenarios still surface as exceptions, and the orchestrator has to decide what counts as recoverable. Lean: aborting the whole batch on exhausted-sink failure is right — losing the ability to observe means losing audit, which is a critical concern. But "abort mid-row" vs "complete row, then abort" matters for partial-write situations. Revisit when the orchestrator code actually has the choice in front of it. |
-| **Status** | parked |
+| **Context / leanings** | Resolved at design time during the 1f planning round: option (d) — tiered failure handling at the decorator level. `ResilientObservationSink` (commit 5 of 1f-i, hash `a148632`) implements 3 retries with backoff, 3-consecutive-failure degradation threshold, severity-based critical detection, and ILogger fallback for critical observations in degraded mode. Full wiring happens in 1f-ii (orchestrators must construct one resilient sink + degradation-state pair per batch). |
+| **Status** | in progress (design landed `a148632`; orchestrator wiring pending 1f-ii) |
 
 ### P-2 — Observation threading through repositories
 
 | | |
 |---|---|
 | **Surfaced in** | Sub-phase 1c (planning round). |
-| **Resolve in** | Sub-phase 1f (orchestrators). |
+| **Resolve in** | Sub-phase 1f-ii (orchestrators emit observations directly via `DomainEventPublisher` and the resilient sink). |
 | **Question** | Should infrastructure interfaces (repositories, adapters) take an `IObservationSink` parameter on every call, or is observation emission strictly the orchestrator's job? |
-| **Context / leanings** | Three options (1c plan): (1) every method takes a sink, (2) orchestrator emits, (3) repositories receive a sink via constructor. Decision in 1c: option (2) for the canonical case, option (3) for the quarantine path specifically (which has internal context the orchestrator doesn't have). 1c interfaces deliberately have no sink parameter; if 1g shows the balance is wrong, adding parameters to interfaces that haven't been implemented yet is cheap. |
-| **Status** | parked |
+| **Context / leanings** | Three options (1c plan): (1) every method takes a sink, (2) orchestrator emits, (3) repositories receive a sink via constructor. Decision in 1c: option (2) for the canonical case, option (3) for the quarantine path specifically. 1c–1e interfaces and services have stayed sink-free; `DomainEventPublisher` (commit 4 of 1f-i, hash `20b4719`) is the orchestrator-side translation surface. The remaining orchestrator wiring in 1f-ii will validate the design end-to-end. |
+| **Status** | in progress (services have stayed sink-free across 1c–1e and 1f-i; `DomainEventPublisher` lands the translation; final validation pending 1f-ii orchestrators) |
 
 ### P-3 — Bounded retry policy
 
@@ -68,6 +68,16 @@ useful when revisiting.
 | **Resolve in** | Phase 6 (job migrations) — or earlier if a Phase 3 reader needs it. |
 | **Question** | Should `ColumnDefinition` gain `Precision` and `Scale` fields, and should `RowValidator` enforce them? |
 | **Context / leanings** | bounds-only validation handles most ranges, but a Postgres `NUMERIC(10,2)` mismatch with a value that has more than 2 fractional digits would silently round at insert time. If Phase 6 migrations surface a real case, add the fields and the corresponding INVALID_PRECISION code (currently not in OBSERVATIONS.md). Until then: YAGNI. |
+| **Status** | parked |
+
+### P-5 — TimeProvider injection in ResilientObservationSink
+
+| | |
+|---|---|
+| **Surfaced in** | Sub-phase 1f-i (commit 5, hash `a148632`). Initial design took a `TimeProvider` constructor parameter (defaulting to `TimeProvider.System`) so tests could inject a `FakeTimeProvider` and advance the clock without real delays. The design deadlocked the test runner: `Task.Delay(TimeSpan, FakeTimeProvider, CancellationToken)` plus xUnit v3's async dispatch plus NSubstitute's `.Returns(callback)` had an interaction that hung `dotnet test` indefinitely on multiple attempts. |
+| **Resolve in** | Whichever sub-phase introduces a genuine clock-driven need in the sink. None today. |
+| **Question** | Should `ResilientObservationSink` carry a `TimeProvider` again, or stay with the explicit-backoff-list shape it ended up with? |
+| **Context / leanings** | Replacement: backoff delays are passed via constructor as `IReadOnlyList<TimeSpan>`. Production callers use `ResilientObservationSink.WithDefaults(...)` for the v1 50/200/800ms schedule; tests construct with zero-delay arrays so the suite runs in milliseconds. Functionally equivalent for what the sink does today; arguably cleaner because backoff schedules are data, not behavior. The `TimeProvider` route is still the right choice when a sub-phase has a genuine clock-driven invariant (e.g., timestamping inside the sink, measuring elapsed time, scheduling future work) — none of those exist today. Don't reintroduce until a real consumer needs it. |
 | **Status** | parked |
 
 ---
