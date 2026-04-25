@@ -34,6 +34,23 @@ public interface IStagingRepository
     Task<BatchId> StartBatchAsync(string source, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Fetch the persisted state of a batch, or <c>null</c> if no
+    /// batch with that id exists. Returns a
+    /// <see cref="BatchSnapshot"/> — a value-shaped projection of the
+    /// <c>batch_log</c> row — which callers (notably
+    /// <c>RetryBatchHandler</c> and <c>InspectBatchHandler</c>) can
+    /// pass to <see cref="Batch.FromState"/> to rehydrate the
+    /// aggregate, or surface directly in inspection results.
+    /// </summary>
+    /// <remarks>
+    /// Handlers convert the <c>null</c> case to
+    /// <see cref="KeyNotFoundException"/>; this interface returns the
+    /// raw nullable so the absence is observable without exception
+    /// flow control across the repository boundary.
+    /// </remarks>
+    Task<BatchSnapshot?> GetBatchAsync(BatchId batch, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Open a <c>file_log</c> entry for an incoming file under a
     /// batch and return its auto-assigned id. Every row staged from
     /// this file will reference the returned id; observations scoped
