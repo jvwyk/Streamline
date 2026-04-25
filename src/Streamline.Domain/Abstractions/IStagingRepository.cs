@@ -9,7 +9,7 @@ namespace Streamline.Domain.Abstractions;
 /// which batches exist, which files contributed to each, every row
 /// staged from those files, the row's current
 /// <see cref="RowStatus"/>, and the quarantine sidecar. First-party
-/// implementations: in-memory fake (sub-phase 1h) and Postgres
+/// implementations: in-memory fake (sub-phase 1f) and Postgres
 /// (Phase 2).
 /// </summary>
 /// <remarks>

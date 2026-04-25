@@ -22,7 +22,7 @@ namespace Streamline.Domain.Registry;
 /// <para>
 /// <b>No I/O, no observations.</b> Same discipline as the row state
 /// machine: pure logic, single source of truth for "is this
-/// registry entry coherent?". Sub-phase 1g decides where the call
+/// registry entry coherent?". Sub-phase 1f decides where the call
 /// sites are (load time, ingestion startup, both).
 /// </para>
 /// </remarks>

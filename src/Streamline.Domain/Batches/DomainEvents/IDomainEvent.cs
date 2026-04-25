@@ -6,7 +6,7 @@ namespace Streamline.Domain.Batches.DomainEvents;
 /// accumulates them; outer handlers drain them after the operation
 /// block completes (fire-and-collect, not async dispatch). The domain
 /// layer never reacts to its own events; that's the orchestrator's
-/// job (sub-phase 1g).
+/// job (sub-phase 1f).
 /// </summary>
 public interface IDomainEvent
 {

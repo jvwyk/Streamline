@@ -44,7 +44,7 @@ namespace Streamline.Domain.Validation;
 /// <para>
 /// <b>FK validation is NOT here.</b> <c>FkResolver</c> (commit 4)
 /// handles FK references on the raw <see cref="Record"/>; the
-/// orchestrator (sub-phase 1g) sequences the two. Loose coupling per
+/// orchestrator (sub-phase 1f) sequences the two. Loose coupling per
 /// 1e Q15.
 /// </para>
 /// <para>

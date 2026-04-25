@@ -5,7 +5,7 @@ namespace Streamline.Domain.Detection;
 /// <summary>
 /// Structured summary of how a source file's columns differ from the
 /// registry entry's <see cref="Streamline.Core.ValueTypes.SchemaDefinition"/>.
-/// Computed by <c>SchemaDriftDetector</c> (Application layer, sub-phase 1g)
+/// Computed by <c>SchemaDriftDetector</c> (Application layer, sub-phase 1f)
 /// from the file's headers and the registry entry's columns; consumed
 /// by the orchestrator to decide which <c>SCHEMA_DRIFT_*</c>
 /// observations to emit at which severity (driven by the entry's

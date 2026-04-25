@@ -25,7 +25,7 @@ namespace Streamline.Domain.Batches;
 /// input, validates the aggregate identity match, validates
 /// state-machine legality, and (for quarantine) emits an event. It
 /// returns nothing — it does NOT return an updated
-/// <see cref="StagedRow"/>. The orchestrator (sub-phase 1g) is
+/// <see cref="StagedRow"/>. The orchestrator (sub-phase 1f) is
 /// responsible for: fetching the row from staging, calling the
 /// aggregate, then calling <c>IStagingRepository.TransitionAsync</c>.
 /// The aggregate never reads from any repository.

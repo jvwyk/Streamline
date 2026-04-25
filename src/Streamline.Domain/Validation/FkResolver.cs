@@ -17,7 +17,7 @@ namespace Streamline.Domain.Validation;
 /// <b>Lifecycle.</b> Per-batch instance, not a DI singleton. The
 /// FK cache for one batch must not leak into the next; predecessor
 /// flag #11 (cache persists across scopes) caused real production
-/// issues. Sub-phase 1g decides where to construct (orchestrator
+/// issues. Sub-phase 1f decides where to construct (orchestrator
 /// startup) and where to discard (orchestrator teardown).
 /// </para>
 /// <para>
@@ -32,8 +32,8 @@ namespace Streamline.Domain.Validation;
 /// what <see cref="ITransactionScope.GetDistinctColumnValuesAsync"/>
 /// returns. <see cref="Validate"/> compares the supplied raw string
 /// directly. The orchestrator must call this on the pre-validation
-/// raw <see cref="Record"/>, NOT on a typed
-/// the typed <c>ValidationResult.ValidatedRecord</c>: round-tripping
+/// raw <see cref="Record"/>, NOT on the typed
+/// <c>ValidationResult.ValidatedRecord</c>: round-tripping
 /// typed values through string conversion would introduce format
 /// mismatches (DateOnly.ToString() vs Postgres date rendering,
 /// decimal trailing zeros, etc.).

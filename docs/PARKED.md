@@ -35,7 +35,7 @@ useful when revisiting.
 | | |
 |---|---|
 | **Surfaced in** | Sub-phase 1b (commit 3, IObservationSink interface). |
-| **Resolve in** | Sub-phase 1g (use-case handlers / orchestrators). |
+| **Resolve in** | Sub-phase 1f (use-case handlers / orchestrators). |
 | **Question** | When `IObservationSink.RecordAsync` throws inside a per-row hot loop (e.g. `RowValidator` emitting `MISSING_REQUIRED` per row), should the orchestrator abort the row currently being processed, abort the whole batch, or let the in-flight row complete before bubbling? |
 | **Context / leanings** | The interface contract (1b) says exceptions propagate; production sinks buffer to avoid hot-path faulting. But buffer overflow / retry-exhausted scenarios still surface as exceptions, and the orchestrator has to decide what counts as recoverable. Lean: aborting the whole batch on exhausted-sink failure is right — losing the ability to observe means losing audit, which is a critical concern. But "abort mid-row" vs "complete row, then abort" matters for partial-write situations. Revisit when the orchestrator code actually has the choice in front of it. |
 | **Status** | parked |
@@ -45,7 +45,7 @@ useful when revisiting.
 | | |
 |---|---|
 | **Surfaced in** | Sub-phase 1c (planning round). |
-| **Resolve in** | Sub-phase 1g (orchestrators). |
+| **Resolve in** | Sub-phase 1f (orchestrators). |
 | **Question** | Should infrastructure interfaces (repositories, adapters) take an `IObservationSink` parameter on every call, or is observation emission strictly the orchestrator's job? |
 | **Context / leanings** | Three options (1c plan): (1) every method takes a sink, (2) orchestrator emits, (3) repositories receive a sink via constructor. Decision in 1c: option (2) for the canonical case, option (3) for the quarantine path specifically (which has internal context the orchestrator doesn't have). 1c interfaces deliberately have no sink parameter; if 1g shows the balance is wrong, adding parameters to interfaces that haven't been implemented yet is cheap. |
 | **Status** | parked |
@@ -55,7 +55,7 @@ useful when revisiting.
 | | |
 |---|---|
 | **Surfaced in** | Sub-phase 1d (commit 4, predecessor-bug review). The original "retry loops" bug was misclassified as state-machine; transitions in a retry loop (`RolledBack → Pending → Processing → RolledBack`) are individually legal. The bug is orchestrator-level: the engine should give up after N retries against the same underlying error code. |
-| **Resolve in** | Sub-phase 1j (predecessor-bug regression tests at the orchestrator level) or Phase 4 (operational features — `RetryBatchCommand` is a Phase 4 work item per plan §6). |
+| **Resolve in** | Sub-phase 1i (predecessor-bug regression tests at the orchestrator level) or Phase 4 (operational features — `RetryBatchCommand` is a Phase 4 work item per plan §6). |
 | **Question** | What's the bounded-retry policy? Specifically: (a) maximum retry count per row before the row is forced to a terminal Quarantined state, (b) whether the count is per-row or per-(row, error_code), (c) whether resolved Quarantined rows reset the retry counter when they re-enter Pending. |
 | **Context / leanings** | None yet. The state machine doesn't carry a counter; that would have to live on the staging row or in a sidecar table. Phase 2's Postgres schema is the natural place to add a `retry_count` column on `staging.incoming`. Deferring; revisit when 1j or Phase 4 actively designs `RetryBatchCommand`. |
 | **Status** | parked |

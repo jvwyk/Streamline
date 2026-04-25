@@ -13,7 +13,7 @@ namespace Streamline.Domain.Abstractions;
 /// <para>
 /// <b>Method set is intentionally minimal.</b> v1 needs write paths
 /// (single + batch, for the sink's flush) and read paths scoped to a
-/// batch (for <c>--inspect</c>, sub-phase 1g and Phase 4).
+/// batch (for <c>--inspect</c>, sub-phase 1f and Phase 4).
 /// Observation-id lookup, code-filtered queries, and count queries
 /// are deliberately omitted — add them when a real caller needs
 /// them, not speculatively.

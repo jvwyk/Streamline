@@ -77,7 +77,7 @@ public interface IFileReader
     /// (the file path's leaf name) and
     /// <see cref="Record.SourceRowIndex"/> (zero-based row position).
     /// Values are emitted as raw strings; validation/typing is the
-    /// orchestrator's responsibility (sub-phase 1g).
+    /// orchestrator's responsibility (sub-phase 1f).
     /// </summary>
     IAsyncEnumerable<Record> ReadRowsAsync(
         FileMapping mapping,

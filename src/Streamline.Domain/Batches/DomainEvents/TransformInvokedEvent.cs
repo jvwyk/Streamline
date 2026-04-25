@@ -11,7 +11,7 @@ namespace Streamline.Domain.Batches.DomainEvents;
 /// directly.
 /// </summary>
 /// <remarks>
-/// Emitted by the orchestrator (sub-phase 1g) or the transformer
+/// Emitted by the orchestrator (sub-phase 1f) or the transformer
 /// registry (Phase 4), not by the <c>Batch</c> aggregate itself —
 /// transformer invocation isn't a row state transition.
 /// </remarks>
