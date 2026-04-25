@@ -53,12 +53,18 @@ public sealed class Batch
     public DateTimeOffset StartedAt { get; }
     public DateTimeOffset? CompletedAt { get; private set; }
 
-    private Batch(BatchId id, string source, DateTimeOffset startedAt)
+    private Batch(
+        BatchId id,
+        string source,
+        BatchStatus status,
+        DateTimeOffset startedAt,
+        DateTimeOffset? completedAt)
     {
         Id = id;
         Source = source;
+        Status = status;
         StartedAt = startedAt;
-        Status = BatchStatus.Created;
+        CompletedAt = completedAt;
     }
 
     /// <summary>
@@ -76,7 +82,62 @@ public sealed class Batch
         }
         ArgumentException.ThrowIfNullOrWhiteSpace(source, nameof(source));
 
-        return new Batch(id, source, DateTimeOffset.UtcNow);
+        return new Batch(id, source, BatchStatus.Created, DateTimeOffset.UtcNow, completedAt: null);
+    }
+
+    /// <summary>
+    /// Reconstruct an aggregate from persisted state. Used by
+    /// <c>RetryBatchHandler</c> and <c>InspectBatchHandler</c> when
+    /// they need to operate on an existing batch retrieved from
+    /// <c>IStagingRepository.GetBatchAsync</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Validates the snapshot's structural invariants the same way
+    /// <see cref="Create"/> validates its inputs (BatchId.IsValid,
+    /// non-blank Source, completed-at-not-before-started). The
+    /// snapshot type itself enforces these on construction; this is
+    /// belt-and-braces in case someone hand-constructs an invalid
+    /// snapshot.
+    /// </para>
+    /// <para>
+    /// Subsequent state-machine transitions are gated normally —
+    /// <see cref="FromState"/> is the legitimate entry point for
+    /// rehydration but is not a back door past
+    /// <see cref="BatchStateMachine"/>. A snapshot with
+    /// <see cref="BatchStatus.Completed"/> still throws on any
+    /// transition attempt because Completed is terminal.
+    /// </para>
+    /// </remarks>
+    public static Batch FromState(BatchSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        // BatchSnapshot's record-class constructor enforces structural
+        // invariants on construction; re-running them here is a
+        // belt-and-braces guard for hand-constructed snapshots.
+        if (!snapshot.BatchId.IsValid)
+        {
+            throw new ArgumentException(
+                "Snapshot BatchId must be initialised.", nameof(snapshot));
+        }
+        if (string.IsNullOrWhiteSpace(snapshot.Source))
+        {
+            throw new ArgumentException(
+                "Snapshot Source must be non-blank.", nameof(snapshot));
+        }
+        if (snapshot.CompletedAt.HasValue && snapshot.CompletedAt.Value < snapshot.StartedAt)
+        {
+            throw new ArgumentException(
+                "Snapshot CompletedAt must be on or after StartedAt.", nameof(snapshot));
+        }
+
+        return new Batch(
+            snapshot.BatchId,
+            snapshot.Source,
+            snapshot.Status,
+            snapshot.StartedAt,
+            snapshot.CompletedAt);
     }
 
     // ---- batch-status transitions ---------------------------------------

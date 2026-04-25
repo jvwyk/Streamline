@@ -356,6 +356,85 @@ public class BatchTests
         a.Should().NotBe(c);
     }
 
+    // ---- FromState (rehydration) --------------------------------------
+
+    [Fact]
+    public void FromState_SnapshotInProcessing_RehydratesAggregateInThatState()
+    {
+        var startedAt = new DateTimeOffset(2026, 4, 24, 12, 0, 0, TimeSpan.Zero);
+        var snapshot = new BatchSnapshot(
+            AnyBatch, "src", BatchStatus.Processing, startedAt, CompletedAt: null);
+
+        var batch = Batch.FromState(snapshot);
+
+        batch.Id.Should().Be(AnyBatch);
+        batch.Source.Should().Be("src");
+        batch.Status.Should().Be(BatchStatus.Processing);
+        batch.StartedAt.Should().Be(startedAt);
+        batch.CompletedAt.Should().BeNull();
+        batch.DrainEvents().Should().BeEmpty();  // rehydration emits no events
+    }
+
+    [Fact]
+    public void FromState_SnapshotInFailed_AllowsRetryTransition()
+    {
+        // The retry use case: a Failed snapshot should let the
+        // caller transition Failed → Processing via BeginProcessing.
+        var snapshot = new BatchSnapshot(
+            AnyBatch, "src", BatchStatus.Failed,
+            StartedAt: new DateTimeOffset(2026, 4, 24, 12, 0, 0, TimeSpan.Zero),
+            CompletedAt: new DateTimeOffset(2026, 4, 24, 12, 5, 0, TimeSpan.Zero));
+
+        var batch = Batch.FromState(snapshot);
+
+        var act = () => batch.BeginProcessing();
+        act.Should().NotThrow();
+        batch.Status.Should().Be(BatchStatus.Processing);
+    }
+
+    [Fact]
+    public void FromState_SnapshotInCompleted_BlocksFurtherTransitions()
+    {
+        // FromState is not a back door past the state machine.
+        // A snapshot in Completed is terminal — BeginProcessing must
+        // throw exactly as it would for an aggregate that reached
+        // Completed naturally.
+        var snapshot = new BatchSnapshot(
+            AnyBatch, "src", BatchStatus.Completed,
+            StartedAt: new DateTimeOffset(2026, 4, 24, 12, 0, 0, TimeSpan.Zero),
+            CompletedAt: new DateTimeOffset(2026, 4, 24, 12, 5, 0, TimeSpan.Zero));
+
+        var batch = Batch.FromState(snapshot);
+
+        ((Action)(() => batch.BeginProcessing())).Should()
+            .Throw<Streamline.Domain.Batches.StateMachine.IllegalStateTransitionException>();
+        ((Action)(() => batch.Complete())).Should()
+            .Throw<Streamline.Domain.Batches.StateMachine.IllegalStateTransitionException>();
+        ((Action)(() => batch.Fail("nope"))).Should()
+            .Throw<Streamline.Domain.Batches.StateMachine.IllegalStateTransitionException>();
+    }
+
+    [Fact]
+    public void FromState_NullSnapshot_Throws()
+    {
+        var act = () => Batch.FromState(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void FromState_RejectsInvalidSnapshot_Throws()
+    {
+        // BatchSnapshot's record-class constructor catches the same
+        // invariants, but FromState is a belt-and-braces guard for
+        // hand-constructed snapshots that bypass record validation
+        // (e.g. via reflection in tests). We can't easily synthesize
+        // such an invalid snapshot via the public API, so this test
+        // covers the null path and relies on the snapshot's own
+        // tests (BatchSnapshotTests) for structural validation.
+        var act = () => Batch.FromState(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
     // ---- helpers ------------------------------------------------------
 
     private static Batch AdvanceToProcessing()
