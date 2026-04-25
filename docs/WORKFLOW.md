@@ -430,3 +430,80 @@ This rhythm looks like overhead. It isn't. The alternatives cost more:
 Every step of the cycle is there because its absence has cost
 something, somewhere, on a prior project. The cycle is defensive. It's
 supposed to be slightly annoying. That's how you know it's working.
+
+---
+
+## Appendix A — Sub-phase report format
+
+Every sub-phase closes with a report to the user. Reports use the
+structure below. Same headings, same order, every time. Sections
+are mandatory; an empty section ("Surprises during implementation:
+none") is signal that nothing unusual happened, which is
+information itself.
+
+```markdown
+## Sub-phase X complete
+
+### Commits
+
+| Commit | What |
+|---|---|
+| `<hash>` | <one-line description> |
+
+### Build state
+
+- Tests: <Core count> Core, <Domain count> Domain, <App count> Application,
+  <Architecture count> architecture
+- Warnings: 0
+- Errors: 0
+
+### What landed
+
+Bulleted list of concrete deliverables. Reads as the table of contents
+of what shipped in this sub-phase. Names the types, methods, and
+contracts the next sub-phase can rely on.
+
+### Design decisions resolved during this sub-phase
+
+Each Q1–Qn from the planning round, with the answer chosen and any
+substantive deviation. Plus any P-N parked decisions that resolved
+this sub-phase, with the resolution and the resolving commit hash.
+
+### Active parked decisions
+
+Mirror of `docs/PARKED.md`'s active list. Table with: ID | Surfaced |
+Resolve in | Topic. If a decision is newly parked this sub-phase,
+note that in the report and in the entry's "Surfaced in" field.
+
+### Surprises during implementation
+
+Numbered list of things that came up unexpectedly during the sub-
+phase — analyzer reversals, contract refinements, doc-comment
+issues, etc. Honest accounting; "none" is a valid value.
+
+### Surface for next sub-phases
+
+Numbered notes the next sub-phase needs to know — design
+implications, gotchas, contracts established that downstream code
+will lean on. Not exhaustive; just things a reasonable agent might
+miss without the heads-up.
+
+### Next
+
+One sentence pointing at the next sub-phase or asking for the next
+prompt.
+```
+
+### Why the rigid structure
+
+Reports vary when each one is improvised, and the user has to scan
+to find what they're looking for. A fixed structure makes it
+trivial to find:
+- "What did we decide?" → Design decisions
+- "What's still open?" → Active parked decisions
+- "What surprised us?" → Surprises during implementation
+- "What does the next sub-phase need to know?" → Surface for next
+
+Empty sections aren't bloat. They're an explicit "no, nothing here"
+that the reader can trust without rechecking the rest of the
+report.
