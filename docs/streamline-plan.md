@@ -210,6 +210,8 @@ is retained only by older tooling.
         FkEnforcementMode.cs      (Always, WhenParentPopulated, Never)
         DriftPolicy.cs            (Block, Warn, Ignore)
         ColumnTypeCode.cs         (String, Integer, BigInt, Decimal, Date, Timestamp, Boolean, Uuid)
+        TransformKind.cs          (SqlFunction, CSharp)
+        TransformInvocation.cs    (PerBatch — PerRow deferred)
       ValueTypes/
         Record.cs                 (immutable key→value map + SourceFileName + SourceRowIndex)
         ColumnDefinition.cs
