@@ -50,6 +50,7 @@ public class ObservationCodesTests
         "TRANSFORMER_PARTIAL_FAILURE",
         "TRANSFORMER_THREW",
         "TRANSFORMER_NOT_FOUND",
+        "TRANSFORM_MODE_DEFERRED",
 
         // Destination Writes (Replication case)
         "UPSERT_COMPLETED",

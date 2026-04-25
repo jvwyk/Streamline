@@ -113,10 +113,16 @@ public sealed class ProcessingOrchestrator
                 {
                     await EmitAsync(scope, collected, new Observation(
                         ObservationSeverity.Warning,
-                        ObservationCodes.TRANSFORMER_NOT_FOUND,
+                        ObservationCodes.TRANSFORM_MODE_DEFERRED,
                         $"Transform-mode entry '{entry.TableName}' skipped — engine-driven transformer invocation is a Phase 4 work item.",
                         batch.Id.Value,
-                        DateTimeOffset.UtcNow)
+                        DateTimeOffset.UtcNow,
+                        new Dictionary<string, object?>
+                        {
+                            ["table"] = entry.TableName,
+                            ["reference"] = entry.Transform!.Reference,
+                            ["kind"] = entry.Transform!.Kind.ToString(),
+                        })
                     {
                         TableName = entry.TableName,
                     }, cancellationToken).ConfigureAwait(false);

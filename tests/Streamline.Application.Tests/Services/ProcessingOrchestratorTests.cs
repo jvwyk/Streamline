@@ -199,7 +199,7 @@ public class ProcessingOrchestratorTests
     // ---- transform-mode skipped ---------------------------------------
 
     [Fact]
-    public async Task Execute_TransformEntry_SkippedWithWarningObservation()
+    public async Task Execute_TransformEntry_SkippedWithDeferredWarning()
     {
         var fixture = new Fixture();
         var transform = new TransformReference(
@@ -215,10 +215,18 @@ public class ProcessingOrchestratorTests
 
         batch.Status.Should().Be(BatchStatus.Completed);
         result.Tables.Should().BeEmpty();
-        result.Observations.Should().Contain(o =>
-            o.Code == ObservationCodes.TRANSFORMER_NOT_FOUND
+        // TRANSFORM_MODE_DEFERRED is the v1 skip signal — distinct
+        // from TRANSFORMER_NOT_FOUND, which Phase 4 will use for the
+        // genuine "registered but unresolvable" case.
+        var deferred = result.Observations.Should().Contain(o =>
+            o.Code == ObservationCodes.TRANSFORM_MODE_DEFERRED
             && o.Severity == ObservationSeverity.Warning
-            && o.TableName == "trust_metric");
+            && o.TableName == "trust_metric").Subject;
+        deferred.Context["table"].Should().Be("trust_metric");
+        deferred.Context["reference"].Should().Be("domain.calc");
+        deferred.Context["kind"].Should().Be("SqlFunction");
+        result.Observations.Should().NotContain(o =>
+            o.Code == ObservationCodes.TRANSFORMER_NOT_FOUND);
     }
 
     // ---- FK validation ------------------------------------------------

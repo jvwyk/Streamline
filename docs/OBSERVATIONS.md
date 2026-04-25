@@ -169,6 +169,7 @@ possible. Stable; never renamed.
 | `TRANSFORMER_PARTIAL_FAILURE` | Error | Transformer returned `rows_failed > 0`. | `{reference, rows_failed, error_message}` |
 | `TRANSFORMER_THREW` | Critical | Transformer threw an exception. | `{reference, exception_type, message}` |
 | `TRANSFORMER_NOT_FOUND` | Critical | Registry references a transformer that isn't registered. | `{reference, kind}` |
+| `TRANSFORM_MODE_DEFERRED` | Warning | A transform-mode registry entry was encountered by an engine version that doesn't yet implement transformer invocation (Phase 1 v1). The entry is skipped; ship Phase 4 to enable it. Distinct from `TRANSFORMER_NOT_FOUND`, which fires when the registry references a transformer the runtime cannot resolve. | `{table, reference, kind}` |
 
 ### Destination Writes (Replication case)
 

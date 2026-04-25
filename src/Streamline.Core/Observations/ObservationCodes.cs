@@ -93,6 +93,7 @@ public static class ObservationCodes
     public const string TRANSFORMER_PARTIAL_FAILURE = nameof(TRANSFORMER_PARTIAL_FAILURE);
     public const string TRANSFORMER_THREW = nameof(TRANSFORMER_THREW);
     public const string TRANSFORMER_NOT_FOUND = nameof(TRANSFORMER_NOT_FOUND);
+    public const string TRANSFORM_MODE_DEFERRED = nameof(TRANSFORM_MODE_DEFERRED);
 
     #endregion
 
