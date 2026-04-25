@@ -22,8 +22,12 @@
                  (perf rule largely irrelevant for tests, fires noisily on
                  array literals in [InlineData] / call-site arguments)
         CS1591 — missing XML doc comments (tests don't ship public API)
+        xUnit1051 — pass TestContext.Current.CancellationToken to async
+                 methods. Useful for long-running tests; noisy boilerplate
+                 for short ones. xUnit v3 auto-cancels at the timeout
+                 regardless of token plumbing.
     -->
-    <NoWarn>$(NoWarn);CA1707;CA1515;CA1861;CS1591</NoWarn>
+    <NoWarn>$(NoWarn);CA1707;CA1515;CA1861;CS1591;xUnit1051</NoWarn>
   </PropertyGroup>
 
   <ItemGroup Label="Test frameworks">

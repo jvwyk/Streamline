@@ -60,6 +60,16 @@ useful when revisiting.
 | **Context / leanings** | None yet. The state machine doesn't carry a counter; that would have to live on the staging row or in a sidecar table. Phase 2's Postgres schema is the natural place to add a `retry_count` column on `staging.incoming`. Deferring; revisit when 1j or Phase 4 actively designs `RetryBatchCommand`. |
 | **Status** | parked |
 
+### P-4 — Decimal precision / scale tracking on ColumnDefinition
+
+| | |
+|---|---|
+| **Surfaced in** | Sub-phase 1e (commit 2, ColumnTypeParser). v1 parses `Decimal` as `decimal` and uses `MinValue`/`MaxValue` for bounded ranges. There's no precision/scale on `ColumnDefinition`. |
+| **Resolve in** | Phase 6 (job migrations) — or earlier if a Phase 3 reader needs it. |
+| **Question** | Should `ColumnDefinition` gain `Precision` and `Scale` fields, and should `RowValidator` enforce them? |
+| **Context / leanings** | bounds-only validation handles most ranges, but a Postgres `NUMERIC(10,2)` mismatch with a value that has more than 2 fractional digits would silently round at insert time. If Phase 6 migrations surface a real case, add the fields and the corresponding INVALID_PRECISION code (currently not in OBSERVATIONS.md). Until then: YAGNI. |
+| **Status** | parked |
+
 ---
 
 ## Process
