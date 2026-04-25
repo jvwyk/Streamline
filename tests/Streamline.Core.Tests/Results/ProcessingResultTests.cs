@@ -110,4 +110,39 @@ public class ProcessingResultTests
     {
         ProcessingResult.Empty.Observations.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Construct_WithoutObservabilityDegraded_DefaultsToFalse()
+    {
+        var result = new ProcessingResult(
+            [new TableProcessingOutcome("broker", 10, 0, 0, TimeSpan.Zero)]);
+
+        result.ObservabilityDegraded.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Construct_WithObservabilityDegradedTrue_PropagatesThrough()
+    {
+        var result = new ProcessingResult(
+            [new TableProcessingOutcome("broker", 10, 0, 0, TimeSpan.Zero)],
+            observabilityDegraded: true);
+
+        result.ObservabilityDegraded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Equality_IncludesObservabilityDegraded()
+    {
+        var tables = new[] { new TableProcessingOutcome("t", 1, 0, 0, TimeSpan.Zero) };
+        var clean = new ProcessingResult(tables, observabilityDegraded: false);
+        var degraded = new ProcessingResult(tables, observabilityDegraded: true);
+
+        clean.Should().NotBe(degraded);
+    }
+
+    [Fact]
+    public void Empty_HasObservabilityDegradedFalse()
+    {
+        ProcessingResult.Empty.ObservabilityDegraded.Should().BeFalse();
+    }
 }

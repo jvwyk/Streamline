@@ -9,18 +9,28 @@ namespace Streamline.Core.Results;
 /// target table the batch processed, plus the <see cref="Observation"/>s
 /// raised during processing, plus computed totals.
 /// </summary>
+/// <remarks>
+/// <see cref="ObservabilityDegraded"/> mirrors the same flag on
+/// <see cref="IngestionResult"/>: true when the batch's observation
+/// sink hit its degradation threshold during processing and silently
+/// dropped non-critical observations thereafter. Informational output
+/// only; populated by the handler at end-of-batch.
+/// </remarks>
 public sealed record class ProcessingResult
 {
     public ImmutableArray<TableProcessingOutcome> Tables { get; }
     public ImmutableArray<Observation> Observations { get; }
+    public bool ObservabilityDegraded { get; }
 
     public ProcessingResult(
         IEnumerable<TableProcessingOutcome> tables,
-        IEnumerable<Observation>? observations = null)
+        IEnumerable<Observation>? observations = null,
+        bool observabilityDegraded = false)
     {
         ArgumentNullException.ThrowIfNull(tables);
         Tables = [.. tables];
         Observations = observations is null ? [] : [.. observations];
+        ObservabilityDegraded = observabilityDegraded;
     }
 
     public long TotalRowsCommitted => Tables.Sum(t => t.RowsCommitted);
@@ -33,7 +43,8 @@ public sealed record class ProcessingResult
     public bool Equals(ProcessingResult? other) =>
         other is not null
         && Tables.SequenceEqual(other.Tables)
-        && Observations.SequenceEqual(other.Observations);
+        && Observations.SequenceEqual(other.Observations)
+        && ObservabilityDegraded == other.ObservabilityDegraded;
 
     public override int GetHashCode()
     {
@@ -46,6 +57,7 @@ public sealed record class ProcessingResult
         {
             hash.Add(observation);
         }
+        hash.Add(ObservabilityDegraded);
         return hash.ToHashCode();
     }
 }

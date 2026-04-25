@@ -113,4 +113,40 @@ public class IngestionResultTests
     {
         IngestionResult.Empty.Observations.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Construct_WithoutObservabilityDegraded_DefaultsToFalse()
+    {
+        var result = new IngestionResult(
+            [new FileIngestionOutcome("a.csv", 10, 10, 0, TimeSpan.Zero)]);
+
+        result.ObservabilityDegraded.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Construct_WithObservabilityDegradedTrue_PropagatesThrough()
+    {
+        var result = new IngestionResult(
+            [new FileIngestionOutcome("a.csv", 10, 10, 0, TimeSpan.Zero)],
+            observabilityDegraded: true);
+
+        result.ObservabilityDegraded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Equality_IncludesObservabilityDegraded()
+    {
+        var files = new[] { new FileIngestionOutcome("a.csv", 1, 1, 0, TimeSpan.Zero) };
+        var clean = new IngestionResult(files, observabilityDegraded: false);
+        var degraded = new IngestionResult(files, observabilityDegraded: true);
+
+        clean.Should().NotBe(degraded);
+        clean.GetHashCode().Should().NotBe(degraded.GetHashCode());
+    }
+
+    [Fact]
+    public void Empty_HasObservabilityDegradedFalse()
+    {
+        IngestionResult.Empty.ObservabilityDegraded.Should().BeFalse();
+    }
 }
