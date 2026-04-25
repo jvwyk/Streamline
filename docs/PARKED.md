@@ -30,26 +30,6 @@ useful when revisiting.
 
 ## Active deferrals
 
-### P-1 — IObservationSink failure semantics on the hot path
-
-| | |
-|---|---|
-| **Surfaced in** | Sub-phase 1b (commit 3, IObservationSink interface). |
-| **Resolve in** | Sub-phase 1f-ii (orchestrators wire the resilient sink in). |
-| **Question** | When `IObservationSink.RecordAsync` throws inside a per-row hot loop (e.g. `RowValidator` emitting `MISSING_REQUIRED` per row), should the orchestrator abort the row currently being processed, abort the whole batch, or let the in-flight row complete before bubbling? |
-| **Context / leanings** | Resolved at design time during the 1f planning round: option (d) — tiered failure handling at the decorator level. `ResilientObservationSink` (commit 5 of 1f-i, hash `a148632`) implements 3 retries with backoff, 3-consecutive-failure degradation threshold, severity-based critical detection, and ILogger fallback for critical observations in degraded mode. Full wiring happens in 1f-ii (orchestrators must construct one resilient sink + degradation-state pair per batch). |
-| **Status** | in progress (design landed `a148632`; orchestrator wiring pending 1f-ii) |
-
-### P-2 — Observation threading through repositories
-
-| | |
-|---|---|
-| **Surfaced in** | Sub-phase 1c (planning round). |
-| **Resolve in** | Sub-phase 1f-ii (orchestrators emit observations directly via `DomainEventPublisher` and the resilient sink). |
-| **Question** | Should infrastructure interfaces (repositories, adapters) take an `IObservationSink` parameter on every call, or is observation emission strictly the orchestrator's job? |
-| **Context / leanings** | Three options (1c plan): (1) every method takes a sink, (2) orchestrator emits, (3) repositories receive a sink via constructor. Decision in 1c: option (2) for the canonical case, option (3) for the quarantine path specifically. 1c–1e interfaces and services have stayed sink-free; `DomainEventPublisher` (commit 4 of 1f-i, hash `20b4719`) is the orchestrator-side translation surface. The remaining orchestrator wiring in 1f-ii will validate the design end-to-end. |
-| **Status** | in progress (services have stayed sink-free across 1c–1e and 1f-i; `DomainEventPublisher` lands the translation; final validation pending 1f-ii orchestrators) |
-
 ### P-3 — Bounded retry policy
 
 | | |
@@ -102,4 +82,22 @@ When you resolve a deferral:
 
 ## Resolved
 
-*(empty)*
+### P-1 — IObservationSink failure semantics on the hot path
+
+| | |
+|---|---|
+| **Surfaced in** | Sub-phase 1b (commit 3, IObservationSink interface). |
+| **Resolved in** | Sub-phase 1f (design landed in 1f-i `a148632`; orchestrator wiring landed in 1f-ii commits 6–11). |
+| **Question** | When `IObservationSink.RecordAsync` throws inside a per-row hot loop (e.g. `RowValidator` emitting `MISSING_REQUIRED` per row), should the orchestrator abort the row currently being processed, abort the whole batch, or let the in-flight row complete before bubbling? |
+| **Resolution** | Tiered failure handling at the decorator level. `ResilientObservationSink` (1f-i `a148632`) implements 3 retries with backoff, 3-consecutive-failure degradation threshold, severity-based critical detection, and ILogger fallback for critical observations in degraded mode. `PerBatchScope.CreateForBatch` (1f-ii commit 6) wires one resilient sink + degradation-state pair per batch; `IngestionOrchestrator` (1f-ii commit 6), `ProcessingOrchestrator` (1f-ii commit 7), and the four handlers (1f-ii commits 8–11) all consume the scope. Per-row hot loops never see a sink throw — the decorator absorbs transient failures and degrades silently for non-critical observations once the threshold is crossed. The `ObservabilityDegraded` flag on `IngestionResult` and `ProcessingResult` surfaces the degradation to operators after the batch completes. |
+| **Status** | resolved → 1f-i `a148632` (decorator) + 1f-ii commits 6–11 (orchestrator wiring) |
+
+### P-2 — Observation threading through repositories
+
+| | |
+|---|---|
+| **Surfaced in** | Sub-phase 1c (planning round). |
+| **Resolved in** | Sub-phase 1f (`DomainEventPublisher` landed 1f-i `20b4719`; orchestrator emission paths landed 1f-ii commits 6–7). |
+| **Question** | Should infrastructure interfaces (repositories, adapters) take an `IObservationSink` parameter on every call, or is observation emission strictly the orchestrator's job? |
+| **Resolution** | Option (2) — orchestrators emit observations; repositories stay sink-free. `IngestionOrchestrator` (1f-ii commit 6) emits drift, validation, and file-ingested observations; `ProcessingOrchestrator` (1f-ii commit 7) emits upsert-completed, upsert-failed, savepoint-rolled-back, and FK-quarantine observations; both drain aggregate events through `DomainEventPublisher` for batch-lifecycle events. Repositories (`IStagingRepository`, `IRegistryRepository`, `IFileMappingRepository`, `IDestinationAdapter`, `ITransactionScope`) carry no `IObservationSink` parameters. Validated end-to-end across the orchestrator + handler test suites. |
+| **Status** | resolved → 1f-i `20b4719` (publisher) + 1f-ii commits 6–7 (orchestrator emission) |
