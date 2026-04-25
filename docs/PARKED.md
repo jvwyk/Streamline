@@ -60,6 +60,26 @@ useful when revisiting.
 | **Context / leanings** | Replacement: backoff delays are passed via constructor as `IReadOnlyList<TimeSpan>`. Production callers use `ResilientObservationSink.WithDefaults(...)` for the v1 50/200/800ms schedule; tests construct with zero-delay arrays so the suite runs in milliseconds. Functionally equivalent for what the sink does today; arguably cleaner because backoff schedules are data, not behavior. The `TimeProvider` route is still the right choice when a sub-phase has a genuine clock-driven invariant (e.g., timestamping inside the sink, measuring elapsed time, scheduling future work) — none of those exist today. Don't reintroduce until a real consumer needs it. |
 | **Status** | parked |
 
+### P-6 — Observation flow asymmetry between handler and orchestrator
+
+| | |
+|---|---|
+| **Surfaced in** | Sub-phase 1f-ii (commit 10, `679eb7b`). `RetryBatchHandler` emits `BATCH_RETRIED` before delegating to `ProcessingOrchestrator`; the observation reaches the inner sink but never lands in the orchestrator's local `collected` list, so it's missing from the returned `ProcessingResult.Observations`. Fixed by reconstructing the result with the retry observation prepended after the orchestrator returns. |
+| **Resolve in** | Phase 4 if a second handler-side emission case arises, or earlier if the asymmetry causes a bug. |
+| **Question** | Should `PerBatchScope` (or another shared surface) own the captured-observation list so both handler and orchestrator write into the same buffer, replacing the post-hoc result reconstruction? |
+| **Context / leanings** | Today the asymmetry is real but contained. Result types' `Observations` field is documented as "the orchestrator's view"; the handler's pre/post emissions are merged in by hand. Works. The risk is silent drift: a future handler that emits an observation around an orchestrator call without remembering to merge produces a result that omits its own emissions. The fix when it matters: lift the captured-observation list onto `PerBatchScope` (e.g. `PerBatchScope.CapturedObservations`), have orchestrators and handlers both write through it, and return a result whose `Observations` reads from the scope rather than from a per-call local list. Don't refactor preemptively — the surface is single-call-site today, and a wrong abstraction is harder to undo than a noticed second case. |
+| **Status** | parked |
+
+### P-7 — Stuck-in-Ingesting recovery path
+
+| | |
+|---|---|
+| **Surfaced in** | Sub-phase 1f-ii (commit 8, `2f25927`). `BatchStateMachine` has no `Ingesting → Failed` transition (locked in 1d). A batch that throws during ingestion stays in `Ingesting` forever; `IngestBatchHandler` does not transition to `Failed` because the state machine would reject it. Operators can inspect via `InspectBatchHandler` but have no command-level recovery. |
+| **Resolve in** | Phase 4 (operator commands consolidate). |
+| **Question** | How do operators recover a batch stuck in `Ingesting` after a thrown ingestion error? |
+| **Context / leanings** | Three options. (a) Add a `MarkBatchFailedCommand` that operator-explicitly transitions a stuck batch to `Failed`, with an audit observation `BATCH_FAILED_BY_OPERATOR`. (b) Add `Ingesting → Failed` as a legal state-machine transition driven by some other signal. (c) Leave operators to manually update `batch_log` via SQL. (a) is the right answer: operator commands should be auditable; manual SQL is opaque. (b) couples state-machine semantics to recovery semantics, which is the wrong direction. (c) is what we have today by default and isn't acceptable long-term. Resolve when Phase 4 introduces operator commands. |
+| **Status** | parked |
+
 ---
 
 ## Process

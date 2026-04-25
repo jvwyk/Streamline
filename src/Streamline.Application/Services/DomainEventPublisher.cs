@@ -37,6 +37,18 @@ public sealed class DomainEventPublisher
     /// orchestrators collect emissions for the result types without
     /// re-running <see cref="Translate"/>.
     /// </summary>
+    /// <remarks>
+    /// Returns <see cref="Task{Observation}"/> rather than
+    /// <see cref="Task"/> so orchestrators can capture the emitted
+    /// observation for inclusion in result types. Awaiting the call
+    /// yields the observation; storing the result in a
+    /// <see cref="Task"/>-typed variable will fail at compile time.
+    /// This is intentional — the emitted observation is part of the
+    /// call's contract. The signature change from
+    /// <see cref="Task"/> to <see cref="Task{Observation}"/> is
+    /// backward-compatible for await callers but not for callers
+    /// holding the unawaited task in a typed variable.
+    /// </remarks>
     public async Task<Observation> PublishAsync(IDomainEvent domainEvent, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
