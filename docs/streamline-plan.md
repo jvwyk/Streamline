@@ -243,6 +243,7 @@ is retained only by older tooling.
         RegistryEntry.cs
         RegistryValidator.cs      (domain service: validates a registry entry is self-consistent)
       Validation/
+        ColumnTypeParser.cs       (static; ColumnTypeCode → .NET typed value coercion)
         RowValidator.cs           (domain service: validates a Record against a SchemaDefinition)
         FkResolver.cs             (domain service: checks row FK values against loaded cache)
       Transforms/
@@ -432,6 +433,17 @@ Batch aggregate.
 
 **Record.** An immutable key→value map representing a single source row.
 Produced by file readers, consumed by validators and destinations.
+
+**ColumnTypeParser.** Static parser that coerces raw string values to
+.NET typed values per `ColumnTypeCode`. Lives in
+`Streamline.Domain.Validation`, not `Streamline.Core`, because parsing
+is behaviour rather than vocabulary — Core stays flat. Invoked by
+`RowValidator` for the `INVALID_TYPE` check. Uses
+`InvariantCulture`, no whitespace tolerance, no thousand separators
+in decimals; `Date` parses to `DateOnly`, `Timestamp` parses to
+`DateTimeOffset` (never naked `DateTime`); boolean accepts the
+common ETL serialisations (`true/false`, `1/0`, `y/n`, `yes/no`)
+case-insensitively.
 
 **TransformReference.** A registry-declared pointer to a transformer:
 `kind` (`sql_function` or `csharp`), `reference` (the function name or
