@@ -13,8 +13,17 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <!-- Test code doesn't carry the same public-API quality bar as production code. -->
-    <NoWarn>$(NoWarn);CA1707;CA1515;CS1591</NoWarn>
+    <!--
+      Test code doesn't carry the same public-API quality bar as production
+      code. Demoted analyzers and rationale:
+        CA1707 — underscores in identifiers (test names use them by convention)
+        CA1515 — make types internal (test classes are public for xUnit discovery)
+        CA1861 — prefer static readonly over constant array arguments
+                 (perf rule largely irrelevant for tests, fires noisily on
+                 array literals in [InlineData] / call-site arguments)
+        CS1591 — missing XML doc comments (tests don't ship public API)
+    -->
+    <NoWarn>$(NoWarn);CA1707;CA1515;CA1861;CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup Label="Test frameworks">
