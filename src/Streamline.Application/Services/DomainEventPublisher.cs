@@ -29,18 +29,21 @@ public sealed class DomainEventPublisher
     }
 
     /// <summary>
-    /// Translate a single domain event to an observation and emit
-    /// via the underlying sink. Failures propagate per the sink's
-    /// contract; production sinks decorated with
-    /// <c>ResilientObservationSink</c> handle retry and graceful
-    /// degradation.
+    /// Translate a single domain event to an observation, emit via
+    /// the underlying sink, and return the observation. Failures
+    /// propagate per the sink's contract; production sinks decorated
+    /// with <c>ResilientObservationSink</c> handle retry and graceful
+    /// degradation. Returning the translated observation lets
+    /// orchestrators collect emissions for the result types without
+    /// re-running <see cref="Translate"/>.
     /// </summary>
-    public Task PublishAsync(IDomainEvent domainEvent, CancellationToken cancellationToken = default)
+    public async Task<Observation> PublishAsync(IDomainEvent domainEvent, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
 
         var observation = Translate(domainEvent);
-        return _sink.RecordAsync(observation, cancellationToken);
+        await _sink.RecordAsync(observation, cancellationToken).ConfigureAwait(false);
+        return observation;
     }
 
     /// <summary>
