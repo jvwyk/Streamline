@@ -1,0 +1,196 @@
+using System.Collections.Immutable;
+using AwesomeAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+using Streamline.Application.Commands;
+using Streamline.Application.Observability;
+using Streamline.Application.Services;
+using Streamline.Application.Tests.Fakes;
+using Streamline.Core.Enums;
+using Streamline.Core.Observations;
+using Streamline.Core.ValueTypes;
+using Streamline.Domain.Batches;
+using Streamline.Domain.Registry;
+using Xunit;
+using Record = Streamline.Core.ValueTypes.Record;
+
+namespace Streamline.Application.Tests.Regression;
+
+/// <summary>
+/// Cross-component predecessor-bug regression tests. Each test is
+/// tagged with <see cref="PreventsPredecessorBugAttribute"/> naming
+/// the bug it guards against. The meta-test in this file (commit 5)
+/// asserts every <c>[Fact]</c> here carries the attribute.
+/// </summary>
+public class CrossComponentRegressionTests
+{
+    [Fact]
+    [PreventsPredecessorBug("PB-1",
+        "predecessor's FkResolver was scoped longer than a single batch; cached FK " +
+        "values from batch N validated batch N+1's rows. When batch N+1 had a new " +
+        "parent value, child rows referencing it were quarantined as FK violations " +
+        "because the cache didn't reflect the new parent. Streamline constructs a " +
+        "fresh FkResolver per ProcessingOrchestrator.ExecuteAsync call so cache state " +
+        "cannot leak across batches; the lazy per-entry preload from 1h reinforces " +
+        "this by reading destination state at process-time, not orchestrator-startup.")]
+    public async Task FkResolver_CacheDoesNotLeakAcrossBatches()
+    {
+        var fixture = new Fixture();
+        await fixture.RegisterBrokerAndBrokerAddressEntriesAsync();
+
+        // Pre-seed broker_id=1 into the destination — the only
+        // parent value visible to batch 1's FK preload.
+        fixture.Destination.ForTestingOnly_SeedCommitted(
+            "core", "broker", BuildBrokerSchema(),
+            [BrokerTypedRecord(0, brokerId: 1, "Acme")]);
+
+        // Batch 1: a broker_address referencing broker_id=1. Should
+        // commit (FK satisfied).
+        var batch1 = await fixture.SeedAddressBatchAsync(
+            [AddressTypedRecord(0, addressId: 100, brokerId: 1, "addr-1")]);
+        var processHandler = fixture.BuildProcessHandler();
+        var result1 = await processHandler.HandleAsync(new ProcessBatchCommand(batch1));
+        result1.Tables.First(t => t.TableName == "broker_address").RowsCommitted.Should().Be(1,
+            "the broker_address row references broker_id=1 which is in the destination; " +
+            "it must commit");
+
+        // Add a fresh parent value to the destination, NOT visible
+        // to batch 1's hypothetical leaked cache.
+        fixture.Destination.ForTestingOnly_SeedCommitted(
+            "core", "broker", BuildBrokerSchema(),
+            [BrokerTypedRecord(0, brokerId: 4, "Globex")]);
+
+        // Batch 2: a broker_address referencing broker_id=4. With a
+        // fresh FkResolver, the FK preload re-reads the destination
+        // and sees {1, 4}. Without the fresh-resolver guarantee the
+        // cache would still hold {1} only, and broker_id=4 would
+        // quarantine.
+        var batch2 = await fixture.SeedAddressBatchAsync(
+            [AddressTypedRecord(0, addressId: 200, brokerId: 4, "addr-2")]);
+        var result2 = await processHandler.HandleAsync(new ProcessBatchCommand(batch2));
+        result2.Tables.First(t => t.TableName == "broker_address").RowsCommitted.Should().Be(1,
+            "the broker_address row references broker_id=4 which was added to the " +
+            "destination after batch 1 committed; if the FkResolver cache leaked " +
+            "from batch 1, broker_id=4 would not be in the cache and the row would " +
+            "quarantine. Streamline's per-batch FkResolver must see both broker_id=1 " +
+            "and broker_id=4 on this preload");
+
+        // Sanity: nothing was quarantined.
+        var counts = await fixture.Staging.GetRowCountsAsync(batch2, "broker_address");
+        counts[RowStatus.Quarantined].Should().Be(0);
+    }
+
+    // ---- fixtures ----------------------------------------------------
+
+    private sealed class Fixture
+    {
+        public InMemoryStagingRepository Staging { get; } = new();
+        public InMemoryDestinationAdapter Destination { get; } = new();
+        public InMemoryRegistryRepository Registry { get; } = new();
+        public InMemoryObservationRepository Observations { get; } = new();
+
+        public ProcessBatchHandler BuildProcessHandler()
+        {
+            var sink = new ForwardingObservationSink(Observations);
+            var orchestrator = new ProcessingOrchestrator(Registry, Staging, Destination);
+            return new ProcessBatchHandler(
+                Staging, orchestrator, sink,
+                NullLogger<ResilientObservationSink>.Instance);
+        }
+
+        public async Task RegisterBrokerAndBrokerAddressEntriesAsync()
+        {
+            await Registry.UpsertAsync(BuildBrokerEntry());
+            await Registry.UpsertAsync(BuildBrokerAddressEntry());
+        }
+
+        public async Task<BatchId> SeedAddressBatchAsync(IReadOnlyList<Record> records)
+        {
+            var batch = await Staging.StartBatchAsync("/data");
+            var fileLogId = await Staging.OpenFileLogAsync(batch, "addresses.csv");
+            await Staging.BulkInsertIncomingAsync(
+                batch, fileLogId, "broker_address", AsyncEnumerable(records));
+            // Drive batch to Ingested so processing's BeginProcessing
+            // is legal.
+            Staging.ForTestingOnly_SetBatchStatus(batch, BatchStatus.Ingested);
+            return batch;
+        }
+
+        private static async IAsyncEnumerable<Record> AsyncEnumerable(IEnumerable<Record> records)
+        {
+            foreach (var r in records)
+            {
+                yield return r;
+                await Task.Yield();
+            }
+        }
+    }
+
+    private static RegistryEntry BuildBrokerEntry() =>
+        new("broker", BuildBrokerSchema())
+        {
+            TargetSchema = "core",
+            ValidFrom = ActiveWindow().From,
+            ValidTo = ActiveWindow().To,
+        };
+
+    private static RegistryEntry BuildBrokerAddressEntry() =>
+        new("broker_address", new SchemaDefinition(
+        [
+            new ColumnDefinition("address_id", ColumnTypeCode.Integer)
+            {
+                IsRequired = true,
+                IsPrimaryKey = true,
+            },
+            new ColumnDefinition("broker_id", ColumnTypeCode.Integer)
+            {
+                IsRequired = true,
+                FkReference = new FkReference("broker", "broker_id", FkEnforcementMode.Always),
+            },
+            new ColumnDefinition("address", ColumnTypeCode.String)
+            {
+                IsRequired = true,
+                MaxLength = 200,
+            },
+        ]))
+        {
+            TargetSchema = "core",
+            ValidFrom = ActiveWindow().From,
+            ValidTo = ActiveWindow().To,
+            DependsOn = ["broker"],
+        };
+
+    private static SchemaDefinition BuildBrokerSchema() =>
+        new(
+        [
+            new ColumnDefinition("broker_id", ColumnTypeCode.Integer)
+            {
+                IsRequired = true,
+                IsPrimaryKey = true,
+            },
+            new ColumnDefinition("name", ColumnTypeCode.String)
+            {
+                IsRequired = true,
+                MaxLength = 200,
+            },
+        ]);
+
+    private static (DateOnly From, DateOnly To) ActiveWindow()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
+        return (today.AddYears(-1), today.AddYears(1));
+    }
+
+    private static Record BrokerTypedRecord(long index, int brokerId, string name) =>
+        new("brokers.csv", index,
+            ImmutableDictionary<string, object?>.Empty
+                .Add("broker_id", brokerId)
+                .Add("name", name));
+
+    private static Record AddressTypedRecord(
+        long index, int addressId, int brokerId, string address) =>
+        new("addresses.csv", index,
+            ImmutableDictionary<string, object?>.Empty
+                .Add("address_id", addressId)
+                .Add("broker_id", brokerId)
+                .Add("address", address));
+}
