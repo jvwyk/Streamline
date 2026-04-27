@@ -30,6 +30,39 @@ useful when revisiting.
 
 ## Active deferrals
 
+### Phase 4 cluster — operational-recovery items
+
+The deferrals tagged "Resolve in: Phase 4" — currently P-3, P-6,
+P-7, P-8, and P-10 — are not independent additions to the Phase 4
+backlog. They are an **operational-recovery sub-phase scope** that
+Phase 4's planning round must address as a unit, not piecemeal.
+
+The original Phase 4 scope ("operational features: transformers,
+lineage, built-in reconciliation") is too narrow to absorb these
+items silently. Phase 4 design should open with:
+
+- The original three items (transformer invocation,
+  row-level lineage population for engine-driven writes,
+  `BuiltinReconciliationRunner`).
+- Plus the operational-recovery cluster:
+  P-3 (bounded retry policy),
+  P-6 (handler ↔ orchestrator observation flow asymmetry),
+  P-7 (stuck-in-Ingesting recovery via `MarkBatchFailedCommand`),
+  P-8 (stuck-in-Processing recovery via `ResetClaimedAsync` or
+  claim-timeout),
+  P-10 (reconciliation gap closure — overlaps with the original
+  reconciliation runner work).
+
+Estimated impact: original Phase 4 estimate of ~3 weeks expands
+to ~5–6 weeks once these items are absorbed. Treating them as
+silent additions instead of acknowledged scope is how phases slip;
+calling them out keeps the plan honest.
+
+P-9 (file-hash dedup) targets Phase 2 by default but is genuinely
+Phase 2 *or* Phase 4 — when Phase 2 design opens, decide whether
+to ship dedup with the Postgres adapter or defer to Phase 4's
+operational cluster.
+
 ### P-3 — Bounded retry policy
 
 | | |
@@ -50,15 +83,15 @@ useful when revisiting.
 | **Context / leanings** | bounds-only validation handles most ranges, but a Postgres `NUMERIC(10,2)` mismatch with a value that has more than 2 fractional digits would silently round at insert time. If Phase 6 migrations surface a real case, add the fields and the corresponding INVALID_PRECISION code (currently not in OBSERVATIONS.md). Until then: YAGNI. |
 | **Status** | parked |
 
-### P-5 — TimeProvider injection in ResilientObservationSink
+### P-5 — TimeProvider injection (lifted to Phase 2)
 
 | | |
 |---|---|
-| **Surfaced in** | Sub-phase 1f-i (commit 5, hash `a148632`). Initial design took a `TimeProvider` constructor parameter (defaulting to `TimeProvider.System`) so tests could inject a `FakeTimeProvider` and advance the clock without real delays. The design deadlocked the test runner: `Task.Delay(TimeSpan, FakeTimeProvider, CancellationToken)` plus xUnit v3's async dispatch plus NSubstitute's `.Returns(callback)` had an interaction that hung `dotnet test` indefinitely on multiple attempts. |
-| **Resolve in** | Whichever sub-phase introduces a genuine clock-driven need in the sink. None today. |
-| **Question** | Should `ResilientObservationSink` carry a `TimeProvider` again, or stay with the explicit-backoff-list shape it ended up with? |
-| **Context / leanings** | Replacement: backoff delays are passed via constructor as `IReadOnlyList<TimeSpan>`. Production callers use `ResilientObservationSink.WithDefaults(...)` for the v1 50/200/800ms schedule; tests construct with zero-delay arrays so the suite runs in milliseconds. Functionally equivalent for what the sink does today; arguably cleaner because backoff schedules are data, not behavior. The `TimeProvider` route is still the right choice when a sub-phase has a genuine clock-driven invariant (e.g., timestamping inside the sink, measuring elapsed time, scheduling future work) — none of those exist today. Don't reintroduce until a real consumer needs it. |
-| **Status** | parked |
+| **Surfaced in** | Sub-phase 1f-i (commit 5, hash `a148632`). Initial design took a `TimeProvider` constructor parameter on `ResilientObservationSink` (defaulting to `TimeProvider.System`) so tests could inject a `FakeTimeProvider`. Deadlocked the test runner: `Task.Delay(TimeSpan, FakeTimeProvider, CancellationToken)` plus xUnit v3's async dispatch plus NSubstitute's `.Returns(callback)` hung `dotnet test` indefinitely. Replacement: backoff delays passed as `IReadOnlyList<TimeSpan>`. |
+| **Resolve in** | Phase 2. **Lifted from "when needed" because Phase 2 has genuine clock-driven need.** `InMemoryRegistryRepository`'s "active right now" filter uses `DateTimeOffset.UtcNow`; Phase 2's `PostgresRegistryRepository` will mirror it; contract-parity tests need controllable time to exercise date-boundary scenarios cleanly. Without a `TimeProvider` injected at the registry-repository layer (and matching test fixtures), every time-dependent contract-parity test risks date-boundary flakiness. |
+| **Question** | Where does `TimeProvider` enter the design? Lean: at `IRegistryRepository` (where date-windowed "active" filtering already reads `UtcNow`). Don't reintroduce on `ResilientObservationSink` itself — its lockup history makes `TimeProvider` there expensive; the explicit-backoff-list shape continues to work for the sink. |
+| **Context / leanings** | Phase 2 design must inject `TimeProvider` into `InMemoryRegistryRepository` (constructor parameter, defaulting to `TimeProvider.System`) and `PostgresRegistryRepository`. Tests that exercise the active-window filter at date boundaries pass a `FakeTimeProvider`. Same pattern can extend to other registries (`InMemoryFileMappingRepository`, lineage) if any of them gain time-dependent reads — none do today, so don't over-eagerly inject. The `ResilientObservationSink` stays as-is. Cheap to do in Phase 2; expensive to retrofit if Phase 2's contract-parity tests calcify around `DateTimeOffset.UtcNow`. |
+| **Status** | parked → first-tier Phase 2 design item |
 
 ### P-6 — Observation flow asymmetry between handler and orchestrator
 
@@ -85,10 +118,40 @@ useful when revisiting.
 | | |
 |---|---|
 | **Surfaced in** | Sub-phase 1h (planning round, formalised in commit 7's `ProcessingRows_AreNotResetByRetry_DocumentingP8` test). `IStagingRepository.GetPendingRowsAsync` atomically transitions claimed rows from `Pending` to `Processing` per the contract. If a batch is cancelled (or fails for a non-row-level reason) mid-processing, those rows remain in `Processing` indefinitely. `ResetForRetryAsync`'s contract is to reset only `RolledBack` rows; `Processing` rows have no recovery path. |
-| **Resolve in** | Phase 4 (operator commands / claim-recovery semantics). |
+| **Resolve in** | Phase 4 (operator commands / claim-recovery semantics). Part of the operational-recovery cluster. |
 | **Question** | How do orphaned `Processing` rows from a cancelled or failed batch return to `Pending` so they can be re-claimed? |
 | **Context / leanings** | Two options. (a) Add a separate `ResetClaimedAsync` method that transitions `Processing → Pending` for orphaned rows during retry. (b) Add a timestamp-based timeout on `Processing` claims that `ResetForRetryAsync` honors when the claim is older than a threshold. (a) is more explicit but requires the caller to know "this batch was cancelled, reset the claims"; (b) is more automatic but adds a clock dependency. The fix affects both Phase 1 fakes and Phase 2 Postgres equally — designing here would mean designing two implementations when only one is needed today. Park it; let Phase 4 design the right semantics for both. The 1h test documents the current (correct-but-gappy) behaviour; when Phase 4 ships, the test gets updated to reflect the new recovery path. |
 | **Status** | parked |
+
+### P-9 — File-hash dedup (PB-3)
+
+| | |
+|---|---|
+| **Surfaced in** | Sub-phase 1i (planning round). `FILE_SKIPPED_DUPLICATE` is in the `ObservationCodes` catalog (since 1b) but no orchestrator emits it and no staging surface tracks file hashes. PB-3 from the predecessor-bug list maps directly: a redelivered file with the same content was processed twice in the predecessor system, producing duplicate destination rows. |
+| **Resolve in** | Phase 2 by default — dedup needs the staging schema to support a `staging.file_log.content_hash` column that the orchestrator can `SELECT EXISTS(...)` against. **Or** defer to Phase 4's operational-recovery cluster if Phase 2 is over-scoped. Decide during Phase 2 planning. |
+| **Question** | Where does the dedup check live, and what does the staging contract look like? Lean: a new `IStagingRepository.IsFileAlreadyIngestedAsync(string contentHash, BatchId? exclude)` method invoked by `IngestionOrchestrator` before staging rows. Returns true → emit `FILE_SKIPPED_DUPLICATE` Info, skip the file with no rows. Returns false → proceed and persist the hash alongside `OpenFileLogAsync`. |
+| **Context / leanings** | The hashing itself is straightforward (SHA-256 over the file bytes; for stream-based readers, hash as the stream is consumed). The harder design question is the dedup window: dedup against any prior batch ever, or only recent batches? Postgres can index `content_hash` cheaply enough to query the full history. Recommend "dedup against any prior batch where the file was successfully ingested" — re-staging a quarantined file should still run because the operator may have fixed the data. Phase 2 spec: `IsFileAlreadyIngestedAsync` returns true when a `file_log` row exists with the same `content_hash` AND its parent batch reached `Completed` status. |
+| **Status** | parked |
+
+### P-10 — Reconciliation gap (PB-7)
+
+| | |
+|---|---|
+| **Surfaced in** | Sub-phase 1i (planning round). The Phase 1 result types carry the count fields (`RowsRead`, `RowsStaged`, `RowsCommitted`, `RowsQuarantined`, `RowsRolledBack`) but no automatic reconciliation runner compares them. Predecessor PB-7: row counts in vs out diverged silently when transformer logic dropped rows or ingestion lost rows mid-batch; operators only noticed via downstream data-quality complaints. |
+| **Resolve in** | Phase 4 (`BuiltinReconciliationRunner` is on the Phase 4 plan). Part of the operational-recovery cluster. |
+| **Question** | What reconciliation rules should `BuiltinReconciliationRunner` enforce, and at what severity does a mismatch fire? |
+| **Context / leanings** | Two rules at minimum: (1) per-file `RowsRead == RowsStaged + RowsQuarantined`; (2) per-table `RowsCommitted + RowsRolledBack + RowsQuarantined` matches the count of staged rows for that table. Mismatch fires `RECONCILIATION_MISMATCH` at Warning, `RECONCILIATION_PASSED` at Info on success. Phase 4 designs whether mismatch triggers automatic batch-fail (probably not — let the operator decide) or just records the observation. The reconciliation runner reads from the result types after each handler returns, so it doesn't need staging-side queries — it inspects the in-memory outcome. No Phase 1 regression test because no Phase 1 implementation; the gap is closed in Phase 4 by the runner. |
+| **Status** | parked |
+
+### P-11 — Handler-to-persisted-batch-status bridging
+
+| | |
+|---|---|
+| **Surfaced in** | Sub-phase 1h (Surface for next sub-phases note 1, formalised here in 1i close-out). Phase 1's handlers operate on the in-memory `Batch` aggregate; the persisted `BatchSnapshot` (returned by `IStagingRepository.GetBatchAsync`) is read at handler entry but not written back as the aggregate transitions. The 1h flow tests had to call `ForTestingOnly_SetBatchStatus(batch, BatchStatus.Ingested)` between handlers to drive the persisted snapshot forward; Phase 1 has no production-side path to do this automatically. |
+| **Resolve in** | Phase 2 (Postgres infrastructure). **First-tier design question, not an implementation detail.** |
+| **Question** | Who writes the persisted batch status as the aggregate transitions: the handler, the orchestrator, or a separate persistence pass? |
+| **Context / leanings** | Three options. (a) The orchestrator writes the persisted status when each aggregate lifecycle method fires (e.g., `batch.Start()` triggers a staging-side `UpdateBatchStatusAsync`). (b) The handler writes the persisted status after the orchestrator returns (one write per transition the orchestrator drove). (c) A new `IStagingRepository.SaveBatchAsync(BatchSnapshot)` method that accepts the aggregate's current state and writes whatever the persisted form lacks. Lean (a): orchestrator emits a single status-update call per transition, persisted state stays in lockstep with the aggregate's view. The aggregate already exposes `Status` and `CompletedAt` for consumption. The risk if deferred: Phase 2 ships without bridging, contract-parity tests pass against fakes that don't exercise the bridge, production batches show "Processing in batch_log, Completed in aggregate" inconsistencies that surface as audit-trail gaps. **The single highest-risk parked decision.** Make it Phase 2's first-tier design question. |
+| **Status** | parked → first-tier Phase 2 design item |
 
 ---
 

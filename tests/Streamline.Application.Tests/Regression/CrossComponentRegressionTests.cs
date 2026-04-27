@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Streamline.Application.Commands;
@@ -142,6 +143,44 @@ public class CrossComponentRegressionTests
         // UPSERT_FAILED observation fired so operators see the
         // failure mode.
         result.Observations.Should().Contain(o => o.Code == ObservationCodes.UPSERT_FAILED);
+    }
+
+    // ---- meta-test ---------------------------------------------------
+
+    /// <summary>
+    /// Self-policing discipline: every <c>[Fact]</c> and
+    /// <c>[Theory]</c> method in this class must carry a
+    /// <see cref="PreventsPredecessorBugAttribute"/> naming the
+    /// predecessor bug it guards against. Mirrors the same meta-
+    /// test in <c>Streamline.Domain.Tests.Batches.StateMachine.RowStateMachineRegressionTests</c>;
+    /// per Q4 of the 1i plan, per-assembly meta-tests rather than
+    /// a centralized cross-assembly scan.
+    /// </summary>
+    [Fact]
+    public void All_regression_tests_carry_a_predecessor_bug_attribute()
+    {
+        var regressionTests = typeof(CrossComponentRegressionTests)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(m =>
+                m.GetCustomAttributes<FactAttribute>(true).Any() ||
+                m.GetCustomAttributes<TheoryAttribute>(true).Any())
+            .Where(m => m.Name != nameof(All_regression_tests_carry_a_predecessor_bug_attribute))
+            .ToArray();
+
+        regressionTests.Should().NotBeEmpty(
+            "the class must contain at least one regression test (sanity check)");
+
+        var missingAttribute = regressionTests
+            .Where(m => m.GetCustomAttribute<PreventsPredecessorBugAttribute>() is null)
+            .Select(m => m.Name)
+            .ToArray();
+
+        missingAttribute.Should().BeEmpty(
+            "every regression test must carry a [PreventsPredecessorBug] attribute " +
+            "naming the bug it guards against. A future contributor adding a test " +
+            "here without the attribute fails this meta-test immediately. " +
+            "Missing on: {0}",
+            string.Join(", ", missingAttribute));
     }
 
     // ---- fixtures ----------------------------------------------------
