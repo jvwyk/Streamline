@@ -103,7 +103,6 @@ public sealed class ProcessingOrchestrator
             await using var txn = await _destination.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
             var fkResolver = new FkResolver();
-            await PreloadFksAsync(entries, fkResolver, txn, cancellationToken).ConfigureAwait(false);
 
             foreach (var entry in entries)
             {
@@ -128,6 +127,15 @@ public sealed class ProcessingOrchestrator
                     }, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
+
+                // Lazy FK preload: load this entry's FK references
+                // just before processing it, so a parent that was
+                // already processed earlier in the same batch is
+                // visible (committed-or-pending) to the FK cache.
+                // Bulk-preload-at-start would see an empty parent
+                // for in-batch parent-child references.
+                await PreloadFksForEntryAsync(entry, entries, fkResolver, txn, cancellationToken)
+                    .ConfigureAwait(false);
 
                 var outcome = await ProcessTableAsync(
                     batch, entry, txn, fkResolver, scope, collected, cancellationToken).ConfigureAwait(false);
@@ -171,38 +179,35 @@ public sealed class ProcessingOrchestrator
         return entries;
     }
 
-    private static async Task PreloadFksAsync(
-        IReadOnlyList<RegistryEntry> entries,
+    private static async Task PreloadFksForEntryAsync(
+        RegistryEntry entry,
+        IReadOnlyList<RegistryEntry> allEntries,
         FkResolver fkResolver,
         ITransactionScope txn,
         CancellationToken cancellationToken)
     {
-        var byName = entries.ToDictionary(e => e.TableName, StringComparer.Ordinal);
-        var loaded = new HashSet<FkReference>();
-
-        foreach (var entry in entries)
+        foreach (var column in entry.Schema.Columns)
         {
-            foreach (var column in entry.Schema.Columns)
+            var fk = column.FkReference;
+            if (fk is null || fkResolver.IsLoaded(fk))
             {
-                var fk = column.FkReference;
-                if (fk is null || !loaded.Add(fk))
-                {
-                    continue;
-                }
-
-                if (!byName.TryGetValue(fk.ParentTable, out var parent) || parent.TargetSchema is null)
-                {
-                    // Parent isn't in the active load set or doesn't
-                    // have a destination schema declared — skip the
-                    // preload; FkResolver.Validate will throw if the
-                    // FK is referenced anyway, which surfaces the bug
-                    // loudly.
-                    continue;
-                }
-
-                await fkResolver.LoadAsync(fk, parent.TargetSchema, txn, cancellationToken)
-                    .ConfigureAwait(false);
+                continue;
             }
+
+            var parent = allEntries.FirstOrDefault(e =>
+                string.Equals(e.TableName, fk.ParentTable, StringComparison.Ordinal));
+            if (parent?.TargetSchema is null)
+            {
+                // Parent isn't in the active load set or doesn't
+                // have a destination schema declared — skip the
+                // preload; FkResolver.Validate will throw if the
+                // FK is referenced anyway, which surfaces the bug
+                // loudly.
+                continue;
+            }
+
+            await fkResolver.LoadAsync(fk, parent.TargetSchema, txn, cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 
