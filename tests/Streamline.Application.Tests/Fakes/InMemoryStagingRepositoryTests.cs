@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using AwesomeAssertions;
+using Streamline.Application.Tests.Regression;
 using Streamline.Core.Enums;
 using Streamline.Core.ValueTypes;
 using Streamline.Domain.Batches;
@@ -216,6 +217,13 @@ public class InMemoryStagingRepositoryTests
     }
 
     [Fact]
+    [PreventsPredecessorBug("PB-8",
+        "predecessor allowed concurrent --process invocations on the same batch to " +
+        "claim the same row twice: both invocations transitioned Pending -> Processing " +
+        "without atomic check, both proceeded to upsert, producing duplicate destination " +
+        "rows or insert errors. Streamline's GetPendingRowsAsync atomically transitions " +
+        "Pending -> Processing under a lock (in-memory) or via SELECT FOR UPDATE SKIP " +
+        "LOCKED (Postgres in Phase 2); two concurrent consumers see disjoint claims.")]
     public async Task GetPendingRowsAsync_TwoConcurrentConsumers_NoRowDoubleClaimed()
     {
         var repo = new InMemoryStagingRepository();

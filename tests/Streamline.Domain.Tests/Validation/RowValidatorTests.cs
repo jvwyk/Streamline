@@ -2,6 +2,7 @@ using AwesomeAssertions;
 using Streamline.Core.Enums;
 using Streamline.Core.Observations;
 using Streamline.Core.ValueTypes;
+using Streamline.Domain.Tests.Batches.StateMachine;
 using Streamline.Domain.Validation;
 using Xunit;
 
@@ -322,6 +323,10 @@ public class RowValidatorTests
     // ---- combinatorial -------------------------------------------------
 
     [Fact]
+    [PreventsPredecessorBug("PB-2",
+        "predecessor's RowValidator returned on the first error per row; operators " +
+        "debugging quarantines saw incomplete information. Streamline's RowValidator " +
+        "accumulates every error before returning a Failure result.")]
     public void Validate_RowWithMultipleViolations_ReturnsAllErrors()
     {
         var schema = Schema(

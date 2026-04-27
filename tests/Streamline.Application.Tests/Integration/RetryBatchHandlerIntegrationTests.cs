@@ -3,6 +3,7 @@ using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Streamline.Application.Commands;
 using Streamline.Application.Observability;
+using Streamline.Application.Tests.Regression;
 using Streamline.Application.Services;
 using Streamline.Application.Tests.Fakes;
 using Streamline.Core.Enums;
@@ -91,6 +92,13 @@ public class RetryBatchHandlerIntegrationTests
     }
 
     [Fact]
+    [PreventsPredecessorBug("PB-9",
+        "predecessor's retry logic reset every row in the batch including Quarantined " +
+        "ones, re-processing legitimately-bad data on every retry. Operators expected " +
+        "retry to attempt failed-infrastructure rows again, not re-process validation " +
+        "failures. Streamline's ResetForRetryAsync resets only RolledBack rows per " +
+        "the contract; Quarantined rows stay quarantined and require manual " +
+        "resolution.")]
     public async Task QuarantinedRows_NotResetByRetry()
     {
         var fixture = new Fixture();

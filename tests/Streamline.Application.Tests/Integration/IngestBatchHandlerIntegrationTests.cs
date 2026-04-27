@@ -3,6 +3,7 @@ using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Streamline.Application.Commands;
 using Streamline.Application.Observability;
+using Streamline.Application.Tests.Regression;
 using Streamline.Application.Services;
 using Streamline.Application.Tests.Fakes;
 using Streamline.Core.Enums;
@@ -77,6 +78,14 @@ public class IngestBatchHandlerIntegrationTests
     }
 
     [Fact]
+    [PreventsPredecessorBug("PB-5",
+        "predecessor detected schema drift but didn't always surface or act on it; " +
+        "new columns appeared in source files, were silently dropped, and operators " +
+        "saw no signal until data-quality complaints came in weeks later. Streamline " +
+        "consults DriftPolicy on every file: Block produces SCHEMA_DRIFT_BLOCKED " +
+        "Critical and rejects the file before staging; Warn / Ignore produce the " +
+        "appropriate severity-tagged observation that lands in the result and the " +
+        "observation repository.")]
     public async Task DriftPolicyBlock_RejectsFileWithoutStaging()
     {
         var fixture = new Fixture();

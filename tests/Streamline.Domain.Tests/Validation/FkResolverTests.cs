@@ -3,6 +3,7 @@ using NSubstitute;
 using Streamline.Core.Enums;
 using Streamline.Core.ValueTypes;
 using Streamline.Domain.Abstractions;
+using Streamline.Domain.Tests.Batches.StateMachine;
 using Streamline.Domain.Validation;
 using Xunit;
 
@@ -117,6 +118,12 @@ public class FkResolverTests
     // ---- Validate: throws on un-loaded -------------------------------
 
     [Fact]
+    [PreventsPredecessorBug("PB-6b",
+        "predecessor's FkResolver silently passed validation when an FK hadn't been " +
+        "loaded — masking orchestrator preload bugs and producing orphan rows. " +
+        "Streamline's FkResolver throws InvalidOperationException loudly so the " +
+        "preload bug surfaces at test or first-batch time, not as a data-quality " +
+        "complaint weeks later.")]
     public void Validate_UnloadedFk_ThrowsInvalidOperation()
     {
         var resolver = new FkResolver();
@@ -146,6 +153,14 @@ public class FkResolverTests
 
     [Theory]
     [MemberData(nameof(ValidateMatrix))]
+    [PreventsPredecessorBug("PB-6a",
+        "predecessor's FkResolver in WhenParentPopulated mode treated 'parent table " +
+        "not loaded yet' the same as 'parent table loaded and empty' — letting child " +
+        "rows commit with arbitrary FK values when the parent had been queried but " +
+        "returned zero rows. Streamline's FkResolver distinguishes the two cases: " +
+        "loaded-and-empty under WhenParentPopulated bypasses enforcement (the matrix " +
+        "row populated=false/value=ANY/expected=true verifies this); not-loaded " +
+        "throws (covered by PB-6b's test).")]
     public async Task Validate_HonorsEnforcementMode(
         FkEnforcementMode mode, bool populated, string value, bool expected)
     {
