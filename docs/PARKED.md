@@ -80,6 +80,16 @@ useful when revisiting.
 | **Context / leanings** | Three options. (a) Add a `MarkBatchFailedCommand` that operator-explicitly transitions a stuck batch to `Failed`, with an audit observation `BATCH_FAILED_BY_OPERATOR`. (b) Add `Ingesting → Failed` as a legal state-machine transition driven by some other signal. (c) Leave operators to manually update `batch_log` via SQL. (a) is the right answer: operator commands should be auditable; manual SQL is opaque. (b) couples state-machine semantics to recovery semantics, which is the wrong direction. (c) is what we have today by default and isn't acceptable long-term. Resolve when Phase 4 introduces operator commands. |
 | **Status** | parked |
 
+### P-8 — Stuck-in-Processing recovery after cancellation
+
+| | |
+|---|---|
+| **Surfaced in** | Sub-phase 1h (planning round, formalised in commit 7's `ProcessingRows_AreNotResetByRetry_DocumentingP8` test). `IStagingRepository.GetPendingRowsAsync` atomically transitions claimed rows from `Pending` to `Processing` per the contract. If a batch is cancelled (or fails for a non-row-level reason) mid-processing, those rows remain in `Processing` indefinitely. `ResetForRetryAsync`'s contract is to reset only `RolledBack` rows; `Processing` rows have no recovery path. |
+| **Resolve in** | Phase 4 (operator commands / claim-recovery semantics). |
+| **Question** | How do orphaned `Processing` rows from a cancelled or failed batch return to `Pending` so they can be re-claimed? |
+| **Context / leanings** | Two options. (a) Add a separate `ResetClaimedAsync` method that transitions `Processing → Pending` for orphaned rows during retry. (b) Add a timestamp-based timeout on `Processing` claims that `ResetForRetryAsync` honors when the claim is older than a threshold. (a) is more explicit but requires the caller to know "this batch was cancelled, reset the claims"; (b) is more automatic but adds a clock dependency. The fix affects both Phase 1 fakes and Phase 2 Postgres equally — designing here would mean designing two implementations when only one is needed today. Park it; let Phase 4 design the right semantics for both. The 1h test documents the current (correct-but-gappy) behaviour; when Phase 4 ships, the test gets updated to reflect the new recovery path. |
+| **Status** | parked |
+
 ---
 
 ## Process
