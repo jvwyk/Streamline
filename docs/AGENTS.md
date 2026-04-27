@@ -27,9 +27,25 @@ duplicate the plan — it points at it.
 
 ## Required Reading Before Coding
 
+**New agents landing on this repository for the first time: start with
+`docs/ONBOARDING.md`, which sequences the reading order for first
+sessions and points back to this list.**
+
 Before touching any code on a new task, you must have read:
 
-1. **`streamline-plan.md` — the full plan.** Specifically:
+1. **`HANDOVER.md` — working knowledge.** The disciplines that produced
+   Phase 1's quality, how the user works, specific warnings, the
+   architectural tacit reasoning, the rejected decisions and debug
+   gotchas. Living document; the only living one of the four-doc
+   handover stack. Sections 1–3 are load-bearing; sections 4–9 are
+   reference material. Read 1–3 first, skim 4–9.
+
+2. **`PHASE-N-CLOSEOUT.md` — frozen artifacts of prior phases.** At
+   minimum read the most recent close-out (`PHASE-1-CLOSEOUT.md` if
+   you're entering Phase 2). Tells you what's built, what's parked,
+   what's ready to inherit.
+
+3. **`streamline-plan.md` — the full plan.** Specifically:
    - Section 3 (Scope) so you know what's in and out.
    - Section 5 (Architecture) — DDD layers, project structure, domain
      model.
@@ -37,17 +53,23 @@ Before touching any code on a new task, you must have read:
      deliverables.
    - Section 11 (Decisions) — the non-negotiables.
 
-2. **`TESTING.md` — testing requirements.** What tests are expected,
+4. **`TESTING.md` — testing requirements.** What tests are expected,
    how they're organized, what coverage means for this project.
 
-3. **`WORKFLOW.md` — development rhythm.** How to pick up a task, when
+5. **`WORKFLOW.md` — development rhythm.** How to pick up a task, when
    to stop and ask, how to structure commits, what "done" means.
 
-4. **`PARKED.md` — deferred decisions.** Calls that surfaced in earlier
+6. **`PARKED.md` — deferred decisions.** Calls that surfaced in earlier
    sub-phases but weren't yet ready to make. Review at the start of
    every sub-phase whose name appears in **Resolve in** for any active
    entry. New deferrals get a new entry; resolutions get linked back
-   to the resolving commit.
+   to the resolving commit. Pay particular attention to the **Phase 4
+   cluster framing** at the top of "Active deferrals."
+
+7. **`STANDARDS.md` — the rules indexed.** Flat index of every load-
+   bearing standard with rule + rationale + pointer. Use it when you
+   want to confirm "is this how things are done here?"; the entry's
+   pointer takes you to the authoritative source for depth.
 
 If the task touches a specific concern (transforms, file readers,
 reconciliation, etc.), also skim the relevant subsection of the plan's

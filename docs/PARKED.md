@@ -9,6 +9,15 @@ This is not a backlog of work. It is a backlog of **calls to make**.
 When a phase opens that owns one of these decisions, the agent's
 plan-round must surface the parked item and propose a resolution.
 
+> **Surrounding context for new agents.** If you're a new agent landing
+> on this repository, read `docs/ONBOARDING.md` first for the reading
+> order. The four handover docs surround this one:
+> `HANDOVER.md` (working knowledge — disciplines, how the user works,
+> warnings), `STANDARDS.md` (the rules indexed),
+> `PHASE-N-CLOSEOUT.md` (frozen artifacts of each phase). PARKED.md is
+> consulted constantly during work; the others establish the operating
+> model that produced Phase 1's quality.
+
 ---
 
 ## How to read this file

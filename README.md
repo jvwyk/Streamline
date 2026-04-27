@@ -8,27 +8,47 @@ writes, row-level lineage, and built-in row-count reconciliation.
 
 ## Starting point for contributors
 
-Read **[`docs/AGENTS.md`](docs/AGENTS.md) first.** It defines how the
-project is worked on: required reading before coding, layering rules,
-commit conventions, and the mistakes the project is explicitly guarding
-against.
+**New agents landing on this repository for the first time:** read
+**[`docs/ONBOARDING.md`](docs/ONBOARDING.md) first.** It sequences
+the reading order, points at the load-bearing parts, and gets you
+productive in 15 minutes.
+
+**Returning contributors:** read **[`docs/AGENTS.md`](docs/AGENTS.md)
+first.** It defines how the project is worked on: required reading
+before coding, layering rules, commit conventions, and the mistakes
+the project is explicitly guarding against.
 
 ## Documentation
+
+The four handover docs (read in this order on first session):
+
+| File | Purpose |
+|---|---|
+| [`docs/ONBOARDING.md`](docs/ONBOARDING.md) | First-session sequence. 15-minute read for new agents. |
+| [`docs/HANDOVER.md`](docs/HANDOVER.md) | Working knowledge: disciplines, how the user works, warnings, architectural reasoning, examples, rejected decisions, debug gotchas. **Living document.** |
+| [`docs/PHASE-1-CLOSEOUT.md`](docs/PHASE-1-CLOSEOUT.md) | Frozen artifact of Phase 1's close. What's built, what's parked, what's ready for Phase 2. |
+| [`docs/STANDARDS.md`](docs/STANDARDS.md) | Flat index of every load-bearing standard. 5-minute scan; pointers for depth. |
+
+The authoritative docs (referenced by the handover stack):
 
 | File | Purpose |
 |---|---|
 | [`docs/AGENTS.md`](docs/AGENTS.md) | Session-startup guide. Read on every task. |
 | [`docs/streamline-plan.md`](docs/streamline-plan.md) | Full design: scope, architecture, phases, decisions, open questions. |
-| [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Development rhythm: plan, implement, test, commit. |
+| [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Development rhythm: plan, implement, test, commit. Includes the standing sub-phase report format. |
 | [`docs/TESTING.md`](docs/TESTING.md) | Testing requirements. Strict and enforced. |
 | [`docs/OBSERVATIONS.md`](docs/OBSERVATIONS.md) | Observation taxonomy and stable code catalog. |
 | [`docs/PARKED.md`](docs/PARKED.md) | Deferred decisions awaiting their owning sub-phase. |
 
 ## Status
 
-**End of Phase 0.** Scaffold only — no business logic yet. The solution
-composes, the architecture test enforces layering, and CI is green.
-Phase 1 (domain + in-memory infrastructure) is the next milestone.
+**End of Phase 1.** In-memory verification surface complete — domain
+types, state machines, validators, observability, orchestrators,
+handlers, fakes, integration tests, predecessor-bug regression
+guards. 821 tests, 0 warnings, 9 active parked decisions. Phase 2
+(Postgres infrastructure) is the next milestone; opens with P-5
+(TimeProvider injection) and P-11 (handler ↔ persisted-batch-status
+bridging) as first-tier design questions.
 
 ## Requirements
 
