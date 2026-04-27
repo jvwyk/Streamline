@@ -498,3 +498,656 @@ test in those classes carries the attribute. A new regression test
 without the attribute fails the meta-test immediately.
 
 ---
+
+## 4. Architectural tacit reasoning
+
+The architecture has reasons. They're not all in the formal docs. A
+successor who understands the *why* picks up the project at the same
+standard; a successor who knows only the *what* is one short
+deadline away from undoing decisions that took a sub-phase to make.
+
+### DDD layering as the deliberate inverse of the predecessor's coupling
+
+The strict Core → Domain → Application → Infrastructure → Console
+layering is not arbitrary. The predecessor system had cross-layer
+references everywhere: business logic reaching into ADO.NET,
+domain types depending on serialization formats, infrastructure
+calling back into application services. The result was a system
+nobody could refactor without breaking something distant.
+
+Streamline's layering is the deliberate inverse. NetArchTest enforces
+the layer dependencies; csproj-XML inspection enforces project-level
+boundaries that NetArchTest can't reach. A successor who finds
+themselves wanting to "just add a quick reference from Domain to
+Infrastructure" is recreating the predecessor's coupling — the
+layering tests will catch it, but the right move is to design
+through the contract, not around it.
+
+### Observation taxonomy as the answer to silent failures
+
+The predecessor system's failures were silent. Files that didn't
+arrive, transformations that dropped rows, FK violations that fell
+through cracks, schema drift that no one noticed for weeks. The
+operational cost was real: data quality complaints from downstream
+consumers, post-hoc reconciliation work, lost trust.
+
+Streamline's observation model is the structured answer. Codes are
+stable wire-protocol values (`UPPER_SNAKE`, `nameof()`-locked).
+Severities map to operational meaning (Info / Warning / Error /
+Critical). Every failure mode the predecessor had silently is now an
+observation code with a documented emission point. The
+`OBSERVATIONS.md` catalog is the contract.
+
+The taxonomy isn't optional decoration; it's the engine's answer to
+"how do operators know what happened?" When a successor finds
+themselves implementing a new failure mode, the question is not "do
+I need to emit an observation?" but "what observation code is this?"
+
+### Per-batch FkResolver lifetime preventing PB-1
+
+The `FkResolver` is constructed fresh per
+`ProcessingOrchestrator.ExecuteAsync` call. This is deliberate. The
+predecessor's PB-1: the FK cache outlived a single batch, so a
+parent value added in batch N+1 wasn't visible to FkResolver because
+it had been initialized in batch N. Children quarantined as FK
+violations.
+
+Streamline's defense: per-batch construction. Plus the lazy-per-entry
+preload from 1h means the cache state is scoped even more tightly —
+loaded just before each entry's table runs, against the
+read-your-writes view that includes prior tables' pending writes.
+
+A successor who finds themselves wanting to share `FkResolver`
+across batches "for performance" is recreating PB-1. The
+construction cost is negligible (a `Dictionary<>`); the savings
+aren't worth the cache-leak risk.
+
+### Contract-parity discipline as Phase 2's safety net
+
+The in-memory fakes are designed to mirror Postgres exactly. Every
+contract method's observable end-state must match between the fake
+and the eventual Postgres implementation. The fakes' Q2 design
+question (1g) was specifically about how faithful the destination
+adapter should be: not "it's a fake, take shortcuts" but "observably
+equivalent to Postgres for what the orchestrator does." Read-your-
+writes within a transaction. Per-table savepoint rollback.
+First-match-wins file-mapping resolution. Insertion-order tiebreaker
+on observation timestamps.
+
+This discipline lets Phase 2's contract-parity tests run the same
+scenarios against both fake and Postgres. If Phase 2 ships and the
+1h tests pass unchanged, Phase 2 is correct. A successor who relaxes
+the fakes' faithfulness "because it's just a test fake" is breaking
+Phase 2's safety net.
+
+### Per-table savepoint isolation
+
+`ProcessingOrchestrator` opens a savepoint per table. A failure
+during one table's upsert rolls back only that savepoint and marks
+that table's claimed rows as `RolledBack` (T4). Other tables in the
+same batch continue. The outer transaction commits at the end if
+any tables succeeded.
+
+The reason: blast-radius containment. A schema-drift issue affecting
+one table shouldn't abort an entire batch's worth of progress. The
+predecessor system had no per-table isolation — a single transformer
+failure could roll back hours of upstream work.
+
+### Aggregate-as-policy-gate (not row store)
+
+The `Batch` aggregate validates state transitions and emits domain
+events. It does not hold rows. Row state is owned by
+`IStagingRepository`; counts come from
+`IStagingRepository.GetRowCountsAsync`. The aggregate does not cache
+either.
+
+Holding rows in the aggregate doesn't survive Phase 2: a million-row
+batch can't fit in memory, and "the aggregate is the system of
+record" stops being true the moment persistence is real. The
+aggregate is small on purpose. A successor who finds themselves
+wanting to add a `Rows` collection to the aggregate "for testing
+convenience" is misunderstanding the policy-gate role; use
+`ForTestingOnly_AllRows` on the staging fake instead.
+
+### Throw-on-illegal state machines
+
+`BatchStateMachine` and `RowStateMachine` throw
+`IllegalStateTransitionException` when an illegal transition is
+attempted. This is deliberately loud. Predecessor flag #6: silent
+skips on illegal transitions masked orchestrator preload bugs and
+produced data in inconsistent states.
+
+A successor who finds themselves wanting to "soften" the state
+machine ("just return false, the caller will handle it") is
+recreating predecessor flag #6. The loud throw is the design.
+
+### The "Phase 4 will absorb this" pattern
+
+Multiple parked decisions across Phase 1 ended up at Phase 4: P-3,
+P-6, P-7, P-8, P-10. This is not coincidence — Phase 4 was always
+going to be where operational completeness lands. Phase 1's job was
+deliberate scope discipline: build the verification surface so
+Phase 2 is a Postgres implementation exercise, not a design
+exercise.
+
+When a successor hits something tempting that doesn't fit the
+current phase cleanly, the question to ask is: "is this Phase 4's
+job?" — and usually yes. Bounded retry policy? Phase 4. Operator
+recovery commands? Phase 4. Reconciliation runner? Phase 4.
+Stuck-row recovery? Phase 4. The pattern is real; the cluster
+framing in `PARKED.md` makes it visible.
+
+A successor who tries to absorb operational concerns into Phase 2
+is over-scoping Phase 2. Resist the temptation.
+
+---
+
+## 5. If you find yourself wanting X, the answer is usually Y
+
+These are shortcut signals — when the agent recognizes the want,
+they recognize the answer. Each pattern emerged from Phase 1 work
+where the want was tempting and the answer wasn't immediately
+obvious.
+
+### "I want to add a `Rows` collection to the `Batch` aggregate for testing convenience"
+
+**Answer: use `ForTestingOnly_AllRows` on the staging fake instead.**
+
+The aggregate is policy-gate, not row store. Holding rows in the
+aggregate doesn't survive Phase 2. The fake's `ForTestingOnly_`
+surface exposes audit-trail detail tests need without compromising
+the production design.
+
+### "I want this fake to be more flexible — computed outcomes, configurable behavior"
+
+**Answer: simplest thing that works for v1; add flexibility when a
+real test needs it.**
+
+The 1g `ScriptedTransformer` design specifically rejected a
+`Func<TransformReference, BatchContext, TransformOutcome>` shape in
+favor of a simple list of pre-canned outcomes. The list works for
+every test today; if a test ever needs computed outcomes, add the
+overload then. Speculative flexibility is harder to reason about,
+and "more flexible" usually translates to "more places for bugs to
+hide."
+
+### "I want to retrofit observation emission into a method"
+
+**Answer: orchestrator emits, not the method.**
+
+P-2's resolution: services stay sink-free. Repositories,
+validators, drift detectors, transformers — none of them take an
+`IObservationSink`. The orchestrator translates results / events
+into observations and emits via `DomainEventPublisher` and the
+per-batch sink. A successor who finds themselves wanting to add a
+sink parameter to a service method is undoing P-2's resolution.
+
+### "I want to silently absorb this analyzer warning"
+
+**Answer: suppress with rationale at the smallest scope, never
+globally.**
+
+The CA1707 (UPPER_SNAKE identifiers), CA1720 (type-name enum
+values), and CA1848 (LoggerMessage delegates) suppressions in
+Phase 1 are all class-scoped with a multi-line `Justification`
+explaining why the rule's premise doesn't apply. None are
+project-wide or solution-wide. A successor who edits
+`Directory.Build.props` to suppress an analyzer globally has
+broken a design choice that took deliberate work.
+
+### "I want to share state across two fakes"
+
+**Answer: don't. Each fake owns its own state; cross-references
+are by ID.**
+
+Q3 of the 1g plan resolved this. Postgres tables relate by FK
+identifiers, not by shared backing stores; the fakes mirror that.
+A "shared dictionary" between
+`InMemoryStagingRepository` and `InMemoryLineageRepository` would
+make the fakes diverge from Postgres's actual behavior, which
+would break the contract-parity safety net.
+
+### "I want to relax the state machine to make recovery easier"
+
+**Answer: don't. Add a recovery command in the operational
+phase.**
+
+P-7's resolution was specifically not to add `Ingesting → Failed`
+as a legal state-machine transition. The state machine reflects
+what *can* be observed reliably; recovery semantics are a
+separate concern that lives in operator commands
+(`MarkBatchFailedCommand` in Phase 4). Coupling state-machine
+semantics to recovery semantics is the wrong direction.
+
+### "I want to add a feature that probably belongs in Phase 4"
+
+**Answer: park it. Cite the phase.**
+
+Bounded retry policy? Phase 4. Operator recovery? Phase 4.
+Reconciliation? Phase 4. Stuck-row cleanup? Phase 4. The pattern
+is consistent. When in doubt, surface in the plan, propose
+parking, let the user decide. Don't unilaterally pull Phase 4
+work into the current phase.
+
+### "I want to fight this tooling issue until I crack it"
+
+**Answer: 30 minutes. Then fall back, park as a P-N, move on.**
+
+The `FakeTimeProvider` deadlock cost more than the 30-minute
+budget allows; the explicit-`IReadOnlyList<TimeSpan>`-backoff
+workaround landed and P-5 was parked. The successor has
+permission to choose pragmatism over heroics here.
+
+---
+
+## 6. Concrete context-awareness examples
+
+Five examples from Phase 1 of context-awareness in practice. Each
+shows the pattern: **noticed → surfaced → resolved.**
+
+### FluentAssertions → AwesomeAssertions (Phase 0)
+
+The agent noticed FluentAssertions's licensing terms during
+package selection — commercial use restrictions that would have
+been a real problem for a project intended for production use.
+Surfaced before any test code referenced the package; user
+confirmed the switch; AwesomeAssertions is what the project uses.
+
+The catch saved a future "we have to migrate the entire test
+suite away from a paid library" exercise. Cost at noticing: one
+sentence in a planning round. Cost if missed until later: weeks.
+
+### Bulk FK preload bug discovery (1h commit 6, fix at `fd59469`)
+
+The agent wrote the 1h `MultiTableDependency` integration test
+asserting that the broker_address row with `broker_id=1` commits
+because the parent broker row exists. The test failed. Investigation
+revealed `ProcessingOrchestrator` preloaded all FKs at batch start,
+before any table was processed; in-batch parent-child references
+saw an empty parent. Fix landed as a separate `feat(application)`
+commit ahead of the test commit per WORKFLOW.md.
+
+The test failure was the first sign of the design bug. A less
+careful test (asserting "two rows committed" rather than "the
+broker_address row commits because the parent FK is in the
+destination") would have passed under the buggy implementation —
+the test would have been a false positive, the bug would have
+shipped.
+
+### TRANSFORM_MODE_DEFERRED rename (1f-ii follow-up)
+
+The 1f-ii Processing orchestrator emitted `TRANSFORMER_NOT_FOUND`
+for transform-mode entries in v1. The user noticed during the
+1f-ii close-out that this code reads as "we looked for a transformer
+named X and couldn't find one" — which is the legitimate Phase 4
+error for an unresolvable transformer reference, not the v1 case
+of "transform mode isn't implemented yet."
+
+The agent surfaced agreement with the user's catch, added
+`TRANSFORM_MODE_DEFERRED` to `OBSERVATIONS.md` and `ObservationCodes`,
+updated the orchestrator and tests, and reserved
+`TRANSFORMER_NOT_FOUND` for Phase 4. Diagnostic clarity in Phase 4
+production was the real cost; the small disruption now was worth it.
+
+### `InMemoryFileReaderRegistry` gap (1g → 1h)
+
+During 1g planning, the agent missed that `IngestionOrchestrator`
+depends on `IFileReaderRegistry` and that no fake existed for it.
+The 1g plan listed eight fakes; this should have been nine. The gap
+surfaced during 1h commit 1 when integration tests needed to wire
+the orchestrator and there was nothing to register file readers
+with.
+
+The agent surfaced the gap explicitly in the 1h plumbing commit:
+"InMemoryFileReaderRegistry: filling a gap from 1g — the
+orchestrator depends on this contract but no fake landed in 1g's
+commits." The fix was minimal (~70 lines including tests). Honest
+gap, honestly named.
+
+The lesson: even careful planning leaves gaps. When one surfaces,
+the right move is to name it, not to bury it inside an unrelated
+commit.
+
+### Phase 4 cluster framing (1i close-out)
+
+The agent and user noticed that the Phase 4 backlog was accumulating
+parked decisions silently. By the end of 1i, five parked items
+targeted Phase 4. The user surfaced the framing question: are these
+five items five independent additions, or are they one absorbed
+sub-phase scope?
+
+The agent agreed with the cluster framing and produced the PARKED.md
+section that names Phase 4 explicitly as the operational-recovery
+sub-phase scope. Original ~3-week estimate expands to ~5–6 weeks;
+the estimate is now honest, not silently optimistic.
+
+The pattern: when parked decisions accumulate against the same
+phase, frame them as a cluster before that phase opens.
+
+---
+
+## 7. Rejected decisions, with reasoning
+
+Eight load-bearing rejections from Phase 1. The successor must not
+relitigate these without good reason; this section names the reason
+each was made.
+
+### Boolean parsing — broad tokens, not strict `bool.TryParse`
+
+**Rejected:** strict `bool.TryParse` (accepts only "True" / "False"
+case-insensitive, plus "true" / "false").
+**Chosen:** broader token set including "yes" / "no" / "y" / "n" /
+"1" / "0" plus the bool.TryParse defaults.
+**Reason:** the predecessor's data uses these tokens. Strict parsing
+would reject legitimate source data. Q11 of 1e (reversed during
+the planning round).
+
+### Cross-fake state coordination — independent fakes, not shared store
+
+**Rejected:** a shared in-memory store that all fakes read/write
+to via constructor injection.
+**Chosen:** each fake owns its own state; cross-references are by
+ID; the orchestrator passes valid IDs.
+**Reason:** Postgres tables relate by FK identifiers, not by shared
+backing stores. The fakes mirror that to keep the contract-parity
+safety net intact. Q3 of 1g.
+
+### State-machine placement — separate `StateMachine/` folder, not inline
+
+**Rejected:** state-machine logic embedded in factory methods on
+the aggregate.
+**Chosen:** dedicated `StateMachine/` folder with `RowStateMachine`
+and `BatchStateMachine` as static classes; the legal-transition
+matrix is the single source of truth.
+**Reason:** the state machine is the contract. Embedding it in the
+aggregate scatters the matrix and makes "what's legal?" a question
+that requires reading multiple methods. The separate static class
+is the obvious answer when the question is asked. 1d planning round.
+
+### `PerBatchScope` — static factory, not raw constructor
+
+**Rejected:** `new PerBatchScope(state, sink, publisher)` with
+callers wiring the three pieces themselves.
+**Chosen:** static `PerBatchScope.CreateForBatch(innerSink, logger)`
+that constructs and wires the three pieces internally.
+**Reason:** the three pieces have non-trivial coupling
+(`ResilientObservationSink` decorates `innerSink` with `state`;
+`DomainEventPublisher` wraps the resilient sink). Exposing the raw
+constructor would let callers build broken combinations. Q6 of 1f-ii.
+
+### FK preload — lazy per-entry, not bulk-at-start
+
+**Rejected:** `ProcessingOrchestrator.PreloadFksAsync` running once
+at batch start before any table is processed.
+**Chosen:** `PreloadFksForEntryAsync` running just before each
+entry's table is processed; `FkResolver.IsLoaded` short-circuits
+redundant loads.
+**Reason:** the bulk-at-start shape didn't see in-batch parent-child
+references. Surfaced during 1h's `MultiTableDependency` test.
+`fd59469`.
+
+### Meta-test scope — per-assembly, not centralized cross-assembly
+
+**Rejected:** a single meta-test scanning all assemblies for
+`[PreventsPredecessorBug]` via reflection-by-name.
+**Chosen:** per-assembly meta-tests with attribute duplication
+across `Domain.Tests` and `Application.Tests`.
+**Reason:** centralization would require either circular project
+references or a shared test-utilities project — both more cost
+than the ~30-line attribute duplication. Q4 of 1i.
+
+### `ScriptedTransformer` — list of outcomes, not `Func<>`
+
+**Rejected:** constructor takes
+`Func<TransformReference, BatchContext, TransformOutcome>` for
+computed outcomes.
+**Chosen:** constructor takes `IEnumerable<TransformOutcome>?`
+plus an `Enqueue(TransformOutcome)` method for incremental setup.
+**Reason:** tests need predictable outcomes, not computed ones.
+The `Func<>` shape is more flexible but harder to reason about;
+add it when a real test needs it. Q4 of 1g.
+
+### Sub-phase split — 1f-i / 1f-ii, not mid-phase renumbering
+
+**Rejected:** when the 1f sub-phase needed to split mid-stream
+(at 5/11 commits), renumber subsequent sub-phases (1g → 1h, 1h →
+1i, etc.).
+**Chosen:** introduce 1f-i and 1f-ii as the sub-phase identifiers;
+1g, 1h, 1i remain.
+**Reason:** renumbering invalidates references in commit messages,
+PARKED.md entries, and prior reports. The 1f-i/1f-ii split keeps
+references stable and isolates the change to the affected
+sub-phase only.
+
+---
+
+## 8. Debug gotchas
+
+Seven debugs from Phase 1 that cost real time. Each one names the
+symptom, the cause, and the fix. A successor hitting one of these
+should recognize the symptom and apply the fix without re-paying
+the original debug cost.
+
+### `FakeTimeProvider` + xUnit v3 + NSubstitute deadlock
+
+**Symptom:** `dotnet test` hangs indefinitely; no output, no
+timeout, multiple stuck processes accumulate. Cannot Ctrl-C
+cleanly.
+**Cause:** `Task.Delay(TimeSpan, FakeTimeProvider, CancellationToken)`
+plus xUnit v3's async dispatch plus NSubstitute's
+`.Returns(callback)` interact in a way that produces an unresolvable
+await. The `FakeTimeProvider` doesn't advance through the dispatcher,
+so the `Task.Delay` never completes; the test never finishes; the
+process never exits.
+**Fix:** don't use `FakeTimeProvider` with `Task.Delay` in this stack.
+For `ResilientObservationSink`, the workaround was passing backoff
+delays as `IReadOnlyList<TimeSpan>`; tests construct with zero-delay
+arrays so the suite runs in milliseconds. Production calls
+`ResilientObservationSink.WithDefaults(...)` for the v1 50/200/800ms
+schedule.
+**Parked as:** P-5. Phase 2 introduces `TimeProvider` at the
+registry-repository layer where the deadlock pattern doesn't apply.
+
+### `[EnumeratorCancellation]` CS8424 on non-async-iterator wrappers
+
+**Symptom:** compiler error CS8424: "The EnumeratorCancellationAttribute
+applied to parameter 'cancellationToken' will have no effect."
+**Cause:** the attribute only applies to async-iterator methods
+(those with `yield return` directly in their body). A wrapper method
+that delegates to an async-iterator and is not itself one will
+trip the analyzer.
+**Fix:** don't use the wrapper pattern. Either inline the iteration
+into the method that needs `[EnumeratorCancellation]`, or write the
+helper directly as `async IAsyncEnumerable<T>` with its own `yield
+return`. Caught during 1g while writing the staging fake's test
+helpers.
+
+### CA1707 / CA1720 / CA1848 protocol-identifier suppression pattern
+
+**Symptom:** analyzer warnings on identifier shapes that are
+deliberately protocol-shaped (UPPER_SNAKE observation codes,
+type-name enum values like `String` / `Integer` / `Decimal`,
+LoggerMessage delegates on a non-hot-path).
+**Cause:** the analyzers don't know the context. Their default
+rules are correct for general code; they're wrong for
+wire-protocol values, type-mapping enums, and decorator-pattern
+loggers.
+**Fix:** class-level `[SuppressMessage]` with multi-line
+`Justification` text explaining why the rule's premise doesn't
+apply. Suppressions are at the smallest scope that works (class,
+not assembly); never project-wide. Examples: `ObservationCodes`
+(CA1707), `ColumnTypeCode` (CA1720), `ResilientObservationSink`
+and `InMemoryDestinationAdapter` (CA1848). Pattern established in
+1b.
+
+### csproj-XML + NetArchTest hybrid for empty-assembly architecture rules
+
+**Symptom:** NetArchTest can't enforce rules on empty assemblies
+or on the project-reference graph itself. Want to assert "the Core
+project references no other Streamline project" but Core has no
+types yet.
+**Cause:** NetArchTest operates on loaded assemblies. An empty
+assembly has nothing to check.
+**Fix:** the architecture-test project parses csproj XML directly
+to validate project references for empty/skeletal projects, and
+uses NetArchTest for the loaded-types layering rules. Two
+mechanisms, one purpose: keep the layering invariants enforced
+even in projects that haven't accumulated types yet. Established
+in Phase 0; pattern in `tests/Streamline.Architecture.Tests/`.
+
+### `[PreventsPredecessorBug]` cross-assembly attribute duplication
+
+**Symptom:** want to use `[PreventsPredecessorBug]` from
+`Application.Tests` and `Domain.Tests`; the attribute is `internal`
+in one assembly; the other can't see it.
+**Cause:** the attribute lives in `Domain.Tests/Batches/StateMachine/`
+where the original SM-* tests landed; making it `public` doesn't
+help cross-assembly reference because `Application.Tests` doesn't
+reference `Domain.Tests`.
+**Fix:** duplicate the attribute as `internal` in
+`Application.Tests/Regression/`. Two distinct attribute types from
+the runtime's perspective, but identical name and shape; per-
+assembly meta-tests scan their own copy. Avoids cross-assembly
+project references and a shared test-utilities project. 1i commit 1.
+
+### `xUnit.Record` name collision with `Streamline.Core.ValueTypes.Record`
+
+**Symptom:** test files importing both `Xunit` and
+`Streamline.Core.ValueTypes` see `Record` as ambiguous; the compiler
+can't pick.
+**Cause:** xUnit defines a `Record` static class for raising/asserting
+exceptions; Streamline's domain has a `Record` value type.
+**Fix:** file-local `using Record =
+Streamline.Core.ValueTypes.Record;` alias at the top of any test
+file that needs the domain `Record` and references xUnit.
+Established in 1c-era tests; the pattern is in every fakes test
+file that uses `Record`.
+
+### CA2241 false positive on curly braces in `becauseArg` strings
+
+**Symptom:** analyzer warning CA2241 ("Provide correct arguments
+to formatting methods") on assertion `becauseArg` strings
+containing `{}` sequences (e.g., "must see {1, 4} on this preload").
+**Cause:** the analyzer interprets `{1, 4}` as a format placeholder
+and complains that no corresponding argument exists. False
+positive for assertion messages, which use the braces literally.
+**Fix:** rephrase the message to avoid the brace syntax ("must see
+broker_id=1 and broker_id=4" instead of "must see {1, 4}").
+Caught during 1i commit 3 writing the PB-1 test.
+
+---
+
+## 9. Phase 1 history (compressed)
+
+The 11 sub-phases (counting Phase 0 separately and 1f as 1f-i / 1f-ii)
+in one paragraph each. This anchors the timeline references in
+earlier sections.
+
+### Phase 0 — solution scaffolding and operating principles
+
+Solution structure (Core, Domain, Application, Infrastructure,
+Console, plus test projects and skeleton readers/registries). xUnit
+v3, AwesomeAssertions, NSubstitute, coverlet wired up. NetArchTest
++ csproj-XML hybrid for architecture enforcement. `WORKFLOW.md`,
+`AGENTS.md`, `README.md`, the project plan. Central Package
+Management. The discipline doc set established here is what every
+sub-phase since has operated under.
+
+### 1a — Domain enums and BatchStatus
+
+Domain enums (`BatchStatus`, `RowStatus`, `ColumnTypeCode`,
+`DriftPolicy`, `FkEnforcementMode`, `TransformKind`,
+`TransformInvocation`). The asymmetry between batch and row state
+machines was settled here.
+
+### 1b — Core observation model
+
+`Observation`, `ObservationSeverity`, `ObservationCodes` (43 codes
+across 11 categories), `IObservationSink`. The catalog-as-wire-
+protocol design and the `nameof()`-locked identifier pattern
+established here.
+
+### 1c — Domain abstractions and infrastructure contracts
+
+Eight infrastructure abstractions (`IStagingRepository`,
+`IDestinationAdapter`, `IRegistryRepository`,
+`IFileMappingRepository`, `ILineageRepository`,
+`IObservationRepository`, `ITransformerRegistry`, `IFileReader`).
+P-2 (observation threading) parked here; resolved later in 1f-ii.
+
+### 1d — State machines and the predecessor-bug pattern
+
+`RowStateMachine` and `BatchStateMachine` with throw-on-illegal
+semantics; the `Batch` aggregate as policy gate; the
+`[PreventsPredecessorBug]` attribute pattern established with
+SM-1a, SM-1b, SM-2, SM-3, SM-4, SM-5. P-3 (bounded retry policy)
+parked here.
+
+### 1e — Validators and parsers
+
+`RowValidator`, `FkResolver`, `ColumnTypeParser`,
+`RegistryValidator`. The Q11 reversed-during-planning boolean
+parsing decision (broad tokens, not strict `bool.TryParse`). P-4
+(decimal precision/scale) parked here.
+
+### 1f-i — Resilient observation sink and `DomainEventPublisher`
+
+`ResilientObservationSink` decorator (3 retries, 3-failure
+threshold, severity-based critical fallback). `DomainEventPublisher`
+for event-to-observation translation. P-1 (sink failure semantics)
+resolved here. P-5 (TimeProvider injection) parked here after the
+`FakeTimeProvider` deadlock.
+
+### 1f-ii — Orchestrators and use-case handlers
+
+`IngestionOrchestrator`, `ProcessingOrchestrator`, four handlers
+(`IngestBatchHandler`, `ProcessBatchHandler`, `RetryBatchHandler`,
+`InspectBatchHandler`), `PerBatchScope`. P-2 resolved here. P-6
+(handler ↔ orchestrator observation flow asymmetry) parked here
+after the `BATCH_RETRIED` merge fix. P-7 (stuck-in-Ingesting
+recovery) parked here.
+
+### 1g — In-memory fakes
+
+Nine in-memory fakes covering every infrastructure contract.
+`InMemoryStagingRepository`, `InMemoryDestinationAdapter`,
+`InMemoryRegistryRepository`, `InMemoryFileMappingRepository`,
+`InMemoryLineageRepository`, `InMemoryObservationRepository`,
+`InMemoryTransformerRegistry`, `ScriptedTransformer`,
+`FakeFileReader`. The contract-parity discipline (faithful enough
+for Phase 2) established here. `InMemoryFileReaderRegistry` was
+missed and surfaced in 1h.
+
+### 1h — Use-case integration tests
+
+Per-handler integration tests plus cross-cutting flow tests
+exercising the full lifecycle against the 1g fakes. The
+`MultiTableDependency` test surfaced the bulk-FK-preload bug
+(fixed at `fd59469`). P-8 (stuck-in-Processing recovery) parked
+here.
+
+### 1i — Predecessor-bug regression tests (non-state-machine)
+
+Six new `[PreventsPredecessorBug]` regression tests (PB-1, PB-4)
+plus reframings (PB-2, PB-5, PB-6a, PB-6b, PB-8, PB-9). PARKED.md
+restructured: P-5 lifted to Phase 2 first-tier, P-9 (file-hash
+dedup) and P-10 (reconciliation gap) added, P-11 (handler-to-
+persisted-batch-status bridging) formalized as the highest-risk
+parked decision. Phase 4 absorbed cluster framing established.
+Phase 1 closes with this commit.
+
+### Predecessor-system context
+
+Streamline replaces a system that processed ETL jobs through
+manual SQL pipelines with bespoke per-job logic. Operational cost
+was significant: silent failures, no observation taxonomy,
+inconsistent retry semantics, no schema-drift handling, brittle FK
+resolution that leaked across batches. Streamline's design choices
+are deliberate inverses of the predecessor's failure modes, which
+is why each parked decision and architectural choice in `HANDOVER.md`
+links back to specific predecessor pain.
+
+The 11 documented predecessor bugs (`[PreventsPredecessorBug]`
+regression tests across Domain.Tests and Application.Tests) are the
+project's direct connection to this history. They are load-bearing.
+
