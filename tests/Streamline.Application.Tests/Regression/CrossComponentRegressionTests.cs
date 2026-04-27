@@ -79,6 +79,71 @@ public class CrossComponentRegressionTests
         counts[RowStatus.Quarantined].Should().Be(0);
     }
 
+    [Fact]
+    [PreventsPredecessorBug("PB-4",
+        "predecessor's quarantine write happened inside the same transaction as the " +
+        "regular row write; if the transaction rolled back, the quarantine record was " +
+        "lost and the next retry re-encountered the same bad row without record of " +
+        "the prior failure. Streamline writes quarantine through IStagingRepository, " +
+        "which is independent of the destination's ITransactionScope — quarantine " +
+        "writes survive any destination-side rollback (savepoint or outer transaction).")]
+    public async Task QuarantineWritesSurviveDestinationUpsertFailure()
+    {
+        var fixture = new Fixture();
+        await fixture.RegisterBrokerAndBrokerAddressEntriesAsync();
+
+        // Pre-seed broker_id=1 so the FK preload returns a non-empty
+        // cache. The valid row references broker_id=1 (will pass FK
+        // and be queued for upsert); the bad row references
+        // broker_id=99 (will fail FK and quarantine BEFORE the upsert
+        // attempt).
+        fixture.Destination.ForTestingOnly_SeedCommitted(
+            "core", "broker", BuildBrokerSchema(),
+            [BrokerTypedRecord(0, brokerId: 1, "Acme")]);
+
+        var batch = await fixture.SeedAddressBatchAsync(
+        [
+            AddressTypedRecord(0, addressId: 100, brokerId: 1, "addr-valid"),
+            AddressTypedRecord(1, addressId: 101, brokerId: 99, "addr-bad-fk"),
+        ]);
+
+        // Wire the failing adapter. The orchestrator will FK-validate
+        // (good row passes, bad row quarantines), then attempt the
+        // upsert which will throw. The orchestrator's per-table catch
+        // rolls back the savepoint and marks the validated row as
+        // RolledBack. The quarantine write happened earlier and is
+        // not in the savepoint's scope.
+        var failingDestination = new FailingOnUpsertDestinationAdapter(fixture.Destination);
+        var sink = new ForwardingObservationSink(fixture.Observations);
+        var orchestrator = new ProcessingOrchestrator(
+            fixture.Registry, fixture.Staging, failingDestination);
+        var handler = new ProcessBatchHandler(
+            fixture.Staging, orchestrator, sink,
+            NullLogger<ResilientObservationSink>.Instance);
+
+        var result = await handler.HandleAsync(new ProcessBatchCommand(batch));
+
+        // Contract: quarantine records persist after the per-table
+        // upsert failure. Verify via ForTestingOnly_AllQuarantine
+        // (the audit-trail surface) — the bad-FK row's quarantine
+        // record is there.
+        var quarantine = fixture.Staging.ForTestingOnly_AllQuarantine();
+        quarantine.Should().HaveCount(1,
+            "exactly one row had a bad FK and should be quarantined; the upsert " +
+            "failure must not erase the quarantine record");
+        quarantine.Values.Single().Code.Should().Be(ObservationCodes.FK_VIOLATION);
+
+        // The valid row was rolled back because the upsert failed.
+        var counts = await fixture.Staging.GetRowCountsAsync(batch, "broker_address");
+        counts[RowStatus.Quarantined].Should().Be(1);
+        counts[RowStatus.RolledBack].Should().Be(1);
+        counts[RowStatus.Committed].Should().Be(0);
+
+        // UPSERT_FAILED observation fired so operators see the
+        // failure mode.
+        result.Observations.Should().Contain(o => o.Code == ObservationCodes.UPSERT_FAILED);
+    }
+
     // ---- fixtures ----------------------------------------------------
 
     private sealed class Fixture
