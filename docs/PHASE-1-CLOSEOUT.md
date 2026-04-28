@@ -199,8 +199,9 @@ contracts that Phase 1's fakes back. Specifically, Phase 2 builds:
    `PostgresObservationRepository`, plus `IFileReaderRegistry`
    registration via DI.
 2. The schema migrations: `staging.batch_log`, `staging.file_log`,
-   `staging.incoming`, `staging.quarantine`, `staging.row_lineage`,
-   `staging.transform_log`, `staging.reconciliation_log`, plus the
+   `staging.incoming`, `staging.quarantine`, `staging.processing_log`,
+   `staging.row_lineage`, `staging.transform_log`,
+   `staging.reconciliation_log`, `staging.observation_log`, plus the
    registry tables.
 3. **Contract-parity tests.** Every contract test in 1g/1h's fake suite
    should run against both the in-memory fake and Postgres. The fakes
