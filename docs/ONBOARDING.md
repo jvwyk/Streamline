@@ -31,6 +31,10 @@ Read these documents in this order:
 cover-to-cover. They're reference docs; consult them when you're
 working in their domains. Trying to load them all up-front is
 counterproductive — the volume crowds out the load-bearing material.
+`STANDARDS.md` is also consulted on demand — it's the indexed-
+reference member of the four-doc handover stack (alongside this
+file, `HANDOVER.md`, and `PHASE-N-CLOSEOUT.md`), used to confirm
+"is this how things are done here?" rather than read end-to-end.
 
 **Stop condition for the reading round:** after `PARKED.md`, stop.
 Confirm to the user that you've loaded the context. Wait for the
