@@ -98,13 +98,24 @@ layering invariants.
 
 ### Predecessor-bug guards
 
-Eleven documented bugs covered by `[PreventsPredecessorBug]` regression
-tests: SM-1a, SM-1b, SM-2, SM-3, SM-4, SM-5 (state-machine bugs from
-1d) plus PB-1, PB-2, PB-4, PB-5, PB-6a, PB-6b, PB-8, PB-9 (cross-
-component bugs from 1i — counted as 6 unique IDs). Per-assembly meta-
-tests in `RowStateMachineRegressionTests` (Domain) and
-`CrossComponentRegressionTests` (Application) enforce that every
-regression test in those classes carries the attribute.
+Eleven unique predecessor bugs covered by `[PreventsPredecessorBug]`
+regression tests, across fourteen attribute placements: SM-1a, SM-1b,
+SM-2, SM-3, SM-4, SM-5 (state-machine bugs from 1d — six placements
+collapse to five unique IDs because SM-1a / SM-1b are two test variants
+of the same predecessor harm) plus PB-1, PB-2, PB-4, PB-5, PB-6a, PB-6b,
+PB-8, PB-9 (cross-component bugs from 1i — eight placements collapse to
+six unique IDs because PB-6a / PB-6b similarly share one predecessor
+harm). Per-assembly meta-tests in `RowStateMachineRegressionTests`
+(Domain) and `CrossComponentRegressionTests` (Application) enforce that
+every regression test in those classes carries the attribute.
+
+**Convention for close-out metric counts.** Headline numbers in the
+metric table at the top of this document use unique bug IDs (one count
+per real predecessor harm). When attribute placements differ from the
+headline — because one bug needs multiple guard tests, denoted by the
+`a`/`b` suffix — the prose names the collapse explicitly (e.g.,
+SM-1a/1b → SM-1, PB-6a/6b → PB-6). Future close-outs follow the same
+rule.
 
 ### Documentation
 
