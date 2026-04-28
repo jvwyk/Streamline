@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    End-to-end tests. References the host (Streamline.Console) and the
+    first-party backends and file readers the host composes, so that a
+    test can drive the engine from an entry point close to production.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Streamline.Console\Streamline.Console.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Infrastructure\Streamline.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Registry.Postgres\Streamline.Registry.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Registry.Yaml\Streamline.Registry.Yaml.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Registry.Hybrid\Streamline.Registry.Hybrid.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Files.Delimited\Streamline.Files.Delimited.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Files.Xlsx\Streamline.Files.Xlsx.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Files.Json\Streamline.Files.Json.csproj" />
+    <ProjectReference Include="..\..\src\Streamline.Files.Zip\Streamline.Files.Zip.csproj" />
+  </ItemGroup>
+
+</Project>

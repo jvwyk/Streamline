@@ -1,0 +1,66 @@
+using System.Collections.Immutable;
+using Streamline.Core.Observations;
+
+namespace Streamline.Core.Results;
+
+/// <summary>
+/// Batch-level ingestion outcome returned by <c>IngestBatchHandler</c>.
+/// Aggregates <see cref="FileIngestionOutcome"/> records across every
+/// file the batch staged, plus the <see cref="Observation"/>s raised
+/// during ingestion, plus computed totals.
+/// </summary>
+/// <remarks>
+/// <see cref="ObservabilityDegraded"/> reflects whether the batch's
+/// observation sink hit its degradation threshold during processing
+/// (per the resilient-sink contract; see Phase 1 sub-phase 1f).
+/// True means some observations may have been dropped silently after
+/// the sink failed enough consecutive times that the engine stopped
+/// attempting non-critical emission. The flag is informational
+/// output only — the handler populates it from the per-batch
+/// degradation state at end-of-batch; orchestrators don't set it.
+/// </remarks>
+public sealed record class IngestionResult
+{
+    public ImmutableArray<FileIngestionOutcome> Files { get; }
+    public ImmutableArray<Observation> Observations { get; }
+    public bool ObservabilityDegraded { get; }
+
+    public IngestionResult(
+        IEnumerable<FileIngestionOutcome> files,
+        IEnumerable<Observation>? observations = null,
+        bool observabilityDegraded = false)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        Files = [.. files];
+        Observations = observations is null ? [] : [.. observations];
+        ObservabilityDegraded = observabilityDegraded;
+    }
+
+    public long TotalRowsRead => Files.Sum(f => f.RowsRead);
+    public long TotalRowsStaged => Files.Sum(f => f.RowsStaged);
+    public long TotalRowsQuarantined => Files.Sum(f => f.RowsQuarantined);
+    public TimeSpan TotalDuration => Files.Aggregate(TimeSpan.Zero, (acc, f) => acc + f.Duration);
+
+    public static IngestionResult Empty { get; } = new(Array.Empty<FileIngestionOutcome>());
+
+    public bool Equals(IngestionResult? other) =>
+        other is not null
+        && Files.SequenceEqual(other.Files)
+        && Observations.SequenceEqual(other.Observations)
+        && ObservabilityDegraded == other.ObservabilityDegraded;
+
+    public override int GetHashCode()
+    {
+        var hash = default(HashCode);
+        foreach (var file in Files)
+        {
+            hash.Add(file);
+        }
+        foreach (var observation in Observations)
+        {
+            hash.Add(observation);
+        }
+        hash.Add(ObservabilityDegraded);
+        return hash.ToHashCode();
+    }
+}

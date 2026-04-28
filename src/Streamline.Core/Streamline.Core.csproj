@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Core: foundation layer. No dependencies on any Streamline project,
+    no framework extensions (Microsoft.Extensions.*), no persistence, no
+    logging. Pure .NET primitives and value types only. Enforced by the
+    architecture tests.
+  -->
+
+</Project>

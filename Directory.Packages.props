@@ -1,0 +1,47 @@
+<Project>
+
+  <!--
+    Central Package Management. Every PackageReference in this repo must omit
+    its Version attribute; the version comes from this file. This gives us
+    one canonical place to upgrade a package and prevents version drift.
+
+    Additions land in the commit that first consumes the package. Keep
+    groupings clear: analyzers, test frameworks, production dependencies.
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="Analyzers">
+    <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.203" />
+  </ItemGroup>
+
+  <ItemGroup Label="Test frameworks">
+    <!--
+      xUnit v3 is the current generation for new .NET 10 projects.
+      AwesomeAssertions is the community fork of FluentAssertions 7.x under
+      Apache-2.0; FluentAssertions 8.x moved to a paid commercial licence.
+    -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.4.0" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.4.0" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.0" />
+    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
+  </ItemGroup>
+
+  <ItemGroup Label="Logging">
+    <!--
+      Domain and Application code talks to ILogger<T> from
+      Microsoft.Extensions.Logging.Abstractions only — keeps Core/Domain
+      free of any concrete logging dependency. Serilog (or any other
+      provider) is configured in Streamline.Console at composition time;
+      its package version lands when Console first references it.
+    -->
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
+  </ItemGroup>
+
+</Project>

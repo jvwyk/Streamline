@@ -1,0 +1,48 @@
+<Project>
+
+  <!--
+    Test-project defaults. Inherits from the repo-root Directory.Build.props
+    (explicit import chain — MSBuild stops at the first Directory.Build.props
+    it finds walking upward). Every project under tests/ gets the test
+    framework package references for free; individual csprojs stay minimal.
+  -->
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!--
+      Test code doesn't carry the same public-API quality bar as production
+      code. Demoted analyzers and rationale:
+        CA1707 — underscores in identifiers (test names use them by convention)
+        CA1515 — make types internal (test classes are public for xUnit discovery)
+        CA1861 — prefer static readonly over constant array arguments
+                 (perf rule largely irrelevant for tests, fires noisily on
+                 array literals in [InlineData] / call-site arguments)
+        CS1591 — missing XML doc comments (tests don't ship public API)
+        xUnit1051 — pass TestContext.Current.CancellationToken to async
+                 methods. Useful for long-running tests; noisy boilerplate
+                 for short ones. xUnit v3 auto-cancels at the timeout
+                 regardless of token plumbing.
+    -->
+    <NoWarn>$(NoWarn);CA1707;CA1515;CA1861;CS1591;xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup Label="Test frameworks">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

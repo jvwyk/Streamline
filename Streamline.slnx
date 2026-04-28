@@ -1,0 +1,25 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Streamline.Application/Streamline.Application.csproj" />
+    <Project Path="src/Streamline.Console/Streamline.Console.csproj" />
+    <Project Path="src/Streamline.Core/Streamline.Core.csproj" />
+    <Project Path="src/Streamline.Domain/Streamline.Domain.csproj" />
+    <Project Path="src/Streamline.Files.Delimited/Streamline.Files.Delimited.csproj" />
+    <Project Path="src/Streamline.Files.Json/Streamline.Files.Json.csproj" />
+    <Project Path="src/Streamline.Files.Xlsx/Streamline.Files.Xlsx.csproj" />
+    <Project Path="src/Streamline.Files.Zip/Streamline.Files.Zip.csproj" />
+    <Project Path="src/Streamline.Infrastructure/Streamline.Infrastructure.csproj" />
+    <Project Path="src/Streamline.Registry.Hybrid/Streamline.Registry.Hybrid.csproj" />
+    <Project Path="src/Streamline.Registry.Postgres/Streamline.Registry.Postgres.csproj" />
+    <Project Path="src/Streamline.Registry.Yaml/Streamline.Registry.Yaml.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Streamline.Application.Tests/Streamline.Application.Tests.csproj" />
+    <Project Path="tests/Streamline.Architecture.Tests/Streamline.Architecture.Tests.csproj" />
+    <Project Path="tests/Streamline.Core.Tests/Streamline.Core.Tests.csproj" />
+    <Project Path="tests/Streamline.Domain.Tests/Streamline.Domain.Tests.csproj" />
+    <Project Path="tests/Streamline.Infrastructure.Tests/Streamline.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Streamline.Integration.Tests/Streamline.Integration.Tests.csproj" />
+    <Project Path="tests/Streamline.Registry.Postgres.Tests/Streamline.Registry.Postgres.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Hybrid composes the YAML and Postgres registry implementations. It
+    references them directly; Core and Application come in transitively.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Streamline.Domain\Streamline.Domain.csproj" />
+    <ProjectReference Include="..\Streamline.Registry.Postgres\Streamline.Registry.Postgres.csproj" />
+    <ProjectReference Include="..\Streamline.Registry.Yaml\Streamline.Registry.Yaml.csproj" />
+  </ItemGroup>
+
+</Project>

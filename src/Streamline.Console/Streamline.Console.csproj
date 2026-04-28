@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Streamline.Console</RootNamespace>
+    <AssemblyName>Streamline.Console</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Streamline.Core\Streamline.Core.csproj" />
+    <ProjectReference Include="..\Streamline.Domain\Streamline.Domain.csproj" />
+    <ProjectReference Include="..\Streamline.Application\Streamline.Application.csproj" />
+    <ProjectReference Include="..\Streamline.Infrastructure\Streamline.Infrastructure.csproj" />
+    <ProjectReference Include="..\Streamline.Registry.Postgres\Streamline.Registry.Postgres.csproj" />
+    <ProjectReference Include="..\Streamline.Registry.Yaml\Streamline.Registry.Yaml.csproj" />
+    <ProjectReference Include="..\Streamline.Registry.Hybrid\Streamline.Registry.Hybrid.csproj" />
+    <ProjectReference Include="..\Streamline.Files.Delimited\Streamline.Files.Delimited.csproj" />
+    <ProjectReference Include="..\Streamline.Files.Xlsx\Streamline.Files.Xlsx.csproj" />
+    <ProjectReference Include="..\Streamline.Files.Json\Streamline.Files.Json.csproj" />
+    <ProjectReference Include="..\Streamline.Files.Zip\Streamline.Files.Zip.csproj" />
+  </ItemGroup>
+
+</Project>
